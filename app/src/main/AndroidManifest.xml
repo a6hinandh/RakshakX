@@ -64,6 +64,20 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="VPN traffic interception for real-time fraud and phishing protection" />
         </service>
+
+        <service
+            android:name=".email.listener.EmailNotificationListener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name=
+                    "android.service.notification.NotificationListenerService" />
+            </intent-filter>
+
+        </service>
+
+
     </application>
 
 </manifest>
