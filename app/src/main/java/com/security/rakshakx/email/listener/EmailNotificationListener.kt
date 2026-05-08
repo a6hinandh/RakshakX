@@ -1,5 +1,6 @@
 package com.security.rakshakx.email.listener
 
+import com.security.rakshakx.email.warning.WarningNotifier
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -11,6 +12,13 @@ import com.security.rakshakx.email.analyzer.UrlAnalyzer
 import com.security.rakshakx.email.model.EmailFeatures
 import com.security.rakshakx.email.scoring.RiskEngine
 import com.security.rakshakx.email.utils.TextNormalizer
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+import com.security.rakshakx.email.database.ThreatDatabase
+import com.security.rakshakx.email.database.ThreatEntity
 
 class EmailNotificationListener : NotificationListenerService() {
 
@@ -180,6 +188,48 @@ class EmailNotificationListener : NotificationListenerService() {
 
         result.reasons.forEach {
             Log.d("RakshakX", "- $it")
+        }
+
+        // Show warning notification
+        if (result.riskLevel == "HIGH RISK") {
+
+            WarningNotifier.showHighRiskWarning(
+
+                context = this,
+
+                title = fullText,
+
+                reasons = result.reasons
+            )
+
+            // Save threat into database
+            CoroutineScope(Dispatchers.IO).launch {
+
+                val database =
+                    ThreatDatabase.getDatabase(this@EmailNotificationListener)
+
+                val threat = ThreatEntity(
+
+                    title = title,
+
+                    message = fullText,
+
+                    riskScore = result.score,
+
+                    riskLevel = result.riskLevel,
+
+                    timestamp = System.currentTimeMillis()
+                )
+
+                database
+                    .threatDao()
+                    .insertThreat(threat)
+
+                Log.d(
+                    "RakshakX",
+                    "Threat saved into database"
+                )
+            }
         }
     }
 }

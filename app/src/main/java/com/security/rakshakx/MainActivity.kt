@@ -15,7 +15,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 
 import androidx.compose.material3.Button
@@ -27,11 +29,13 @@ import androidx.compose.runtime.Composable
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
+import com.security.rakshakx.email.ui.ThreatHistoryScreen
 import com.security.rakshakx.ui.theme.RakshakXTheme
 import com.security.rakshakx.web.ui.VpnDashboardScreen
 
@@ -75,7 +79,7 @@ class MainActivity : ComponentActivity() {
                             Alignment.CenterHorizontally
                     ) {
 
-                        // VPN dashboard
+                        // VPN Dashboard
                         Box(
                             modifier = Modifier.weight(1f)
                         ) {
@@ -85,11 +89,33 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        Spacer(
+                            modifier = Modifier.height(16.dp)
+                        )
+
+                        // Threat History Dashboard
+                        Box(
+                            modifier = Modifier.weight(1f)
+                        ) {
+
+                            ThreatHistoryScreen(
+                                context = this@MainActivity
+                            )
+                        }
+
+                        Spacer(
+                            modifier = Modifier.height(16.dp)
+                        )
+
                         // Email testing section
                         EmailTestingSection(
                             onSendTestNotification = {
                                 sendFakePhishingNotification()
                             }
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(16.dp)
                         )
                     }
                 }
@@ -185,6 +211,10 @@ fun EmailTestingSection(
             text = "RakshakX Email Threat Testing",
             style =
                 MaterialTheme.typography.headlineSmall
+        )
+
+        Spacer(
+            modifier = Modifier.height(8.dp)
         )
 
         Button(
