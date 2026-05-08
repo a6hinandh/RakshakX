@@ -22,6 +22,12 @@ data class ThreatEntity(
     val level: String,
     val action: String,
     val reasons: String,
+    val fraudScore: Int,
+    val fraudCategory: String,
+    val recommendedAction: String,
+    val blockReason: String,
+    val visibleSignals: String,
+    val correlationData: String,
     val browserPackage: String,
     val url: String,
     val destinationIp: String,
@@ -85,7 +91,7 @@ interface VpnTrafficDao {
     suspend fun recent(limit: Int): List<VpnTrafficEntity>
 }
 
-@Database(entities = [ThreatEntity::class, BrowserSessionEntity::class, VpnTrafficEntity::class], version = 2)
+@Database(entities = [ThreatEntity::class, BrowserSessionEntity::class, VpnTrafficEntity::class], version = 3)
 abstract class ThreatDatabase : RoomDatabase() {
     abstract fun threatDao(): ThreatDao
     abstract fun browserSessionDao(): BrowserSessionDao
@@ -108,7 +114,7 @@ abstract class ThreatDatabase : RoomDatabase() {
 
             return Room.databaseBuilder(context, ThreatDatabase::class.java, "rakshakx_threats.db")
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
         }
 
@@ -142,6 +148,17 @@ abstract class ThreatDatabase : RoomDatabase() {
                         "redirectChain TEXT NOT NULL"
                         + ")"
                 )
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE threats ADD COLUMN fraudScore INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE threats ADD COLUMN fraudCategory TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE threats ADD COLUMN recommendedAction TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE threats ADD COLUMN blockReason TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE threats ADD COLUMN visibleSignals TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE threats ADD COLUMN correlationData TEXT NOT NULL DEFAULT ''")
             }
         }
     }
