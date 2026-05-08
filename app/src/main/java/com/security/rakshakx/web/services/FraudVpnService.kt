@@ -9,12 +9,17 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.security.rakshakx.MainActivity
+import com.security.rakshakx.web.analyzers.FraudRiskAnalyzer
+import com.security.rakshakx.web.analyzers.ScamLanguageAnalyzer
 import com.security.rakshakx.web.analyzers.BrowserNetworkCorrelationEngine
 import com.security.rakshakx.web.analyzers.DomainRiskAnalyzer
 import com.security.rakshakx.web.analyzers.ThreatBlockingEngine
+import com.security.rakshakx.web.analyzers.ThreatIntelRepository
+import com.security.rakshakx.web.analyzers.ThreatScoringEngine
 import com.security.rakshakx.web.extractors.DnsTrafficAnalyzer
 import com.security.rakshakx.web.extractors.PacketParser
 import com.security.rakshakx.web.extractors.RedirectChainTracker
+import com.security.rakshakx.web.models.FraudAction
 import com.security.rakshakx.web.models.ThreatAssessment
 import com.security.rakshakx.web.models.VpnTrafficData
 import com.security.rakshakx.web.notifications.VpnProtectionNotifier
@@ -37,12 +42,21 @@ class FraudVpnService : VpnService() {
     private val parser = PacketParser()
     private val dnsAnalyzer = DnsTrafficAnalyzer()
     private val redirectTracker = RedirectChainTracker()
-    private val riskAnalyzer = DomainRiskAnalyzer()
-    private val correlationEngine = BrowserNetworkCorrelationEngine()
+    private lateinit var riskAnalyzer: DomainRiskAnalyzer
+    private lateinit var correlationEngine: BrowserNetworkCorrelationEngine
     private val blockingEngine = ThreatBlockingEngine()
+    private lateinit var fraudRiskAnalyzer: FraudRiskAnalyzer
+    private lateinit var threatScoringEngine: ThreatScoringEngine
+    private lateinit var intelRepository: ThreatIntelRepository
+    private val scamLanguageAnalyzer = ScamLanguageAnalyzer()
 
     override fun onCreate() {
         super.onCreate()
+        intelRepository = ThreatIntelRepository(this)
+        threatScoringEngine = ThreatScoringEngine(intelRepository)
+        riskAnalyzer = DomainRiskAnalyzer(intelRepository)
+        correlationEngine = BrowserNetworkCorrelationEngine(intelRepository)
+        fraudRiskAnalyzer = FraudRiskAnalyzer(intelRepository, scamLanguageAnalyzer, threatScoringEngine)
         notifier = VpnProtectionNotifier(this)
         notifier.createChannel()
         threatLogger = VpnThreatLogger(this)
@@ -155,22 +169,83 @@ class FraudVpnService : VpnService() {
             threatLogger.logTraffic(traffic)
         }
 
+        val session = BrowserSessionCache.latest()
+        val tlsMismatch = traffic.sniHost.isNotBlank() &&
+            !traffic.sniHost.equals(domain, ignoreCase = true)
+
         val riskAssessment = riskAnalyzer.assess(
-            domain, redirects.size, false, dnsResult?.reasons ?: emptyList()
+            domain = domain,
+            redirectCount = redirects.size,
+            tlsMismatch = tlsMismatch,
+            dnsFlags = dnsResult?.reasons ?: emptyList(),
+            url = session?.url,
+            visibleText = session?.visibleText,
+            passwordField = session?.passwordFieldDetected ?: false,
+            otpField = session?.otpFieldDetected ?: false,
+            emailField = session?.emailFieldDetected ?: false,
+            paymentField = session?.paymentFieldDetected ?: false
         )
 
-        val session = BrowserSessionCache.latest()
         val correlation = correlationEngine.correlate(session, domain)
         val finalAssessment = pickHighestRisk(riskAssessment, correlation)
 
+        val fraudResult = if (session != null && finalAssessment != null) {
+            fraudRiskAnalyzer.analyze(session, traffic, finalAssessment)
+        } else {
+            null
+        }
+
         if (finalAssessment != null) {
             serviceScope.launch {
-                threatLogger.logThreat(finalAssessment, traffic, session)
+                threatLogger.logThreat(finalAssessment, traffic, session, fraudResult)
             }
-            if (blockingEngine.shouldBlock(finalAssessment)) {
-                notifier.notifyThreat("Blocked ${finalAssessment.domain}")
+
+            val action = fraudResult?.action ?: if (finalAssessment.action == com.security.rakshakx.web.models.ThreatAction.BLOCK) {
+                FraudAction.BLOCK
+            } else {
+                FraudAction.ALLOW
+            }
+
+            val displayDomain = pickDisplayDomain(finalAssessment.domain, session)
+            if (blockingEngine.shouldBlock(finalAssessment.domain, action)) {
+                val score = fraudResult?.score ?: 0
+                val category = formatCategory(fraudResult?.category?.name ?: "UNKNOWN")
+                notifier.notifyThreat("Blocked $displayDomain | $category | Score $score")
+            } else if (action == FraudAction.WARN) {
+                val score = fraudResult?.score ?: 0
+                val category = formatCategory(fraudResult?.category?.name ?: "SUSPICIOUS")
+                notifier.notifyThreat("Warning $displayDomain | $category | Score $score")
             }
         }
+    }
+
+    private fun pickDisplayDomain(domain: String, session: com.security.rakshakx.web.models.BrowserSessionData?): String {
+        val visible = extractHost(session?.url.orEmpty())
+        return if (looksLikeToken(domain) && visible.isNotBlank()) {
+            visible
+        } else {
+            domain
+        }
+    }
+
+    private fun looksLikeToken(value: String): Boolean {
+        if (value.isBlank()) return true
+        if (!value.contains('.')) return true
+        val normalized = value.replace("-", "").replace("_", "")
+        val longAlphaNum = normalized.length > 32 && normalized.all { it.isLetterOrDigit() }
+        return longAlphaNum
+    }
+
+    private fun extractHost(url: String): String {
+        val trimmed = url.trim()
+        val noScheme = trimmed.substringAfter("//", trimmed)
+        return noScheme.substringBefore("/")
+            .substringBefore(":")
+            .lowercase()
+    }
+
+    private fun formatCategory(raw: String): String {
+        return raw.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
     }
 
     private fun pickHighestRisk(

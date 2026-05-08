@@ -1,17 +1,16 @@
 package com.security.rakshakx.web.analyzers
 
-import com.security.rakshakx.web.models.ThreatAction
-import com.security.rakshakx.web.models.ThreatAssessment
+import com.security.rakshakx.web.models.FraudAction
 import java.util.concurrent.ConcurrentHashMap
 
 class ThreatBlockingEngine {
     private val allowList = ConcurrentHashMap.newKeySet<String>()
 
-    fun shouldBlock(assessment: ThreatAssessment): Boolean {
-        if (allowList.contains(assessment.domain)) {
+    fun shouldBlock(domain: String, action: FraudAction): Boolean {
+        if (allowList.contains(domain)) {
             return false
         }
-        return assessment.action == ThreatAction.BLOCK
+        return action == FraudAction.BLOCK
     }
 
     fun allowDomain(domain: String) {

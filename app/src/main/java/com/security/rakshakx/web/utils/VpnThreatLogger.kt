@@ -2,6 +2,7 @@ package com.security.rakshakx.web.utils
 
 import android.content.Context
 import com.security.rakshakx.web.models.BrowserSessionData
+import com.security.rakshakx.web.models.FraudRiskResult
 import com.security.rakshakx.web.models.ThreatAssessment
 import com.security.rakshakx.web.models.VpnTrafficData
 import com.security.rakshakx.web.storage.BrowserSessionEntity
@@ -21,7 +22,8 @@ class VpnThreatLogger(context: Context) {
     suspend fun logThreat(
         assessment: ThreatAssessment,
         traffic: VpnTrafficData,
-        session: BrowserSessionData?
+        session: BrowserSessionData?,
+        fraudResult: FraudRiskResult? = null
     ) {
         val entity = ThreatEntity(
             timestamp = assessment.timestamp,
@@ -29,6 +31,12 @@ class VpnThreatLogger(context: Context) {
             level = assessment.level.name,
             action = assessment.action.name,
             reasons = assessment.reasons.joinToString(" | "),
+            fraudScore = fraudResult?.score ?: 0,
+            fraudCategory = fraudResult?.category?.name.orEmpty(),
+            recommendedAction = fraudResult?.action?.name.orEmpty(),
+            blockReason = fraudResult?.blockReason.orEmpty(),
+            visibleSignals = fraudResult?.visibleSignals?.joinToString(" | ").orEmpty(),
+            correlationData = fraudResult?.correlationData.orEmpty(),
             browserPackage = session?.browserPackage.orEmpty(),
             url = session?.url.orEmpty(),
             destinationIp = traffic.destinationIp,
