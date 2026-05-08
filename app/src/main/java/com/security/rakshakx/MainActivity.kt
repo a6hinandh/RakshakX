@@ -18,7 +18,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RakshakXTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    VpnDashboardScreen(this@MainActivity, modifier = Modifier.padding(innerPadding))
+                    VpnDashboardScreen(activity = this@MainActivity, modifier = Modifier.padding(innerPadding))
                 }
             }
         }
