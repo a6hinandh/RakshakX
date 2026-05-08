@@ -1,9 +1,11 @@
 package com.security.rakshakx.web.services
 
 import android.app.PendingIntent
+import android.content.pm.ServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.security.rakshakx.MainActivity
@@ -52,7 +54,16 @@ class FraudVpnService : VpnService() {
             else -> {
                 // Must call startForeground early – Android kills the process if a
                 // foreground service doesn't promote itself within ~5 seconds.
-                startForeground(NOTIFICATION_ID, notifier.buildForegroundNotification())
+                if (Build.VERSION.SDK_INT >= 34) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notifier.buildForegroundNotification(),
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, notifier.buildForegroundNotification())
+                }
                 startVpn()
             }
         }

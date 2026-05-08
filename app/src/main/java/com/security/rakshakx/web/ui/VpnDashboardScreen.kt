@@ -1,7 +1,6 @@
 package com.security.rakshakx.web.ui
 
 import android.app.Activity
-import android.content.Context
 import android.net.VpnService
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,21 +17,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.security.rakshakx.web.services.FraudVpnService
 import com.security.rakshakx.web.utils.VpnStatusStore
 
 @Composable
-fun VpnDashboardScreen(context: Context, modifier: Modifier = Modifier) {
+fun VpnDashboardScreen(activity: Activity, modifier: Modifier = Modifier) {
+    val appContext = activity.applicationContext
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            FraudVpnService.start(context)
+            FraudVpnService.start(appContext)
         }
     }
-
-    val prepareIntent = remember { VpnService.prepare(context) }
     val isRunning = VpnStatusStore.isRunning.collectAsState().value
 
     Column(
@@ -51,16 +48,17 @@ fun VpnDashboardScreen(context: Context, modifier: Modifier = Modifier) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = {
+                        val prepareIntent = VpnService.prepare(activity)
                         if (prepareIntent != null) {
                             launcher.launch(prepareIntent)
                         } else {
-                            FraudVpnService.start(context)
+                            FraudVpnService.start(appContext)
                         }
                     }) {
                         Text("Start VPN")
                     }
 
-                    Button(onClick = { FraudVpnService.stop(context) }) {
+                    Button(onClick = { FraudVpnService.stop(appContext) }) {
                         Text("Stop VPN")
                     }
                 }
