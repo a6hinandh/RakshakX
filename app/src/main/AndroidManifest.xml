@@ -11,6 +11,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <queries>
         <package android:name="com.android.chrome" />
@@ -19,6 +26,7 @@
     </queries>
 
     <application
+        android:name=".RakshakXApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -38,6 +46,90 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".call.CallMainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.Call" />
+
+        <activity
+            android:name=".call.callanalysis.ui.RakshakXActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.Call" />
+
+        <activity
+            android:name=".call.callanalysis.ui.PermissionSetupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.Call" />
+
+        <activity
+            android:name=".call.callanalysis.CallOverlayActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.CallOverlay" />
+
+        <activity
+            android:name=".call.callanalysis.FraudAlertActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.FraudAlert" />
+
+        <activity
+            android:name=".call.callanalysis.SafeCallActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX.SafeCall" />
+
+        <service
+            android:name=".call.services.foreground.FraudMonitoringForegroundService"
+            android:exported="false" />
+
+        <service
+            android:name=".call.callanalysis.CallRecordingService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".call.callanalysis.OverlayBubbleService"
+            android:exported="false" />
+
+        <service
+            android:name=".call.callanalysis.HackathonModeCallMonitorService"
+            android:exported="false" />
+
+        <service
+            android:name=".call.services.receivers.SmsNotificationListenerService"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name=".call.services.receivers.BootCompletedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".call.services.receivers.SmsEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".call.callanalysis.CallStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".call.callanalysis.NotificationActionReceiver"
+            android:exported="false" />
 
         <service
             android:name=".web.services.AccessibilityMonitorService"

@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -36,6 +37,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 
 import com.security.rakshakx.email.ui.ThreatHistoryScreen
+import com.security.rakshakx.call.CallMainActivity
 import com.security.rakshakx.ui.theme.RakshakXTheme
 import com.security.rakshakx.web.ui.VpnDashboardScreen
 
@@ -88,6 +90,18 @@ class MainActivity : ComponentActivity() {
                                 activity = this@MainActivity
                             )
                         }
+
+                        Spacer(
+                            modifier = Modifier.height(16.dp)
+                        )
+
+                        CallMonitoringSection(
+                            onOpenCallMonitoring = {
+                                startActivity(
+                                    Intent(this@MainActivity, CallMainActivity::class.java)
+                                )
+                            }
+                        )
 
                         Spacer(
                             modifier = Modifier.height(16.dp)
@@ -222,6 +236,39 @@ fun EmailTestingSection(
         ) {
 
             Text("Trigger Phishing Test")
+        }
+    }
+}
+
+@Composable
+fun CallMonitoringSection(
+    onOpenCallMonitoring: () -> Unit
+) {
+
+    Column(
+
+        horizontalAlignment =
+            Alignment.CenterHorizontally,
+
+        verticalArrangement =
+            Arrangement.Center
+    ) {
+
+        Text(
+            text = "RakshakX Call & SMS Monitoring",
+            style =
+                MaterialTheme.typography.headlineSmall
+        )
+
+        Spacer(
+            modifier = Modifier.height(8.dp)
+        )
+
+        Button(
+            onClick = onOpenCallMonitoring
+        ) {
+
+            Text("Open Call Monitoring")
         }
     }
 }

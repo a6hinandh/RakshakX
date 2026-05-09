@@ -84,6 +84,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

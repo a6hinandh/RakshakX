@@ -1,0 +1,4 @@
+<resources>
+    <string name="call_analyze">Analyze</string>
+    <string name="call_simulate_fraud_call">Simulate Fraud Call</string>
+</resources>
