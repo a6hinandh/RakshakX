@@ -138,6 +138,36 @@
                 android:background="#1A00E5FF"
                 android:padding="12dp" />
 
+            <TextView
+                android:id="@+id/tvRiskStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Risk: --"
+                android:textColor="#E8EDF5"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/tvCaptureStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Capture: idle"
+                android:textColor="#8892A4"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/tvCaptureSource"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Source: --"
+                android:textColor="#8892A4"
+                android:textSize="12sp"
+                android:fontFamily="monospace" />
+
             <ProgressBar
                 android:id="@+id/pbAnalysis"
                 style="?android:attr/progressBarStyleHorizontal"

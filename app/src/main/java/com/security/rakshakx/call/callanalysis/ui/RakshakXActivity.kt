@@ -9,8 +9,10 @@ import android.provider.CallLog
 import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
+import com.google.android.material.button.MaterialButton
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -20,6 +22,7 @@ import com.security.rakshakx.RakshakXApplication
 import com.security.rakshakx.call.callanalysis.CallAudioRecorder
 import com.security.rakshakx.call.callanalysis.CallRecordingProbe
 import com.security.rakshakx.call.callanalysis.DeviceCapabilities
+import com.security.rakshakx.call.callanalysis.AndroidSpeechTranscriber
 import com.security.rakshakx.call.callanalysis.FraudIntentClassifier
 import com.security.rakshakx.call.callanalysis.PreActionDecisionEngine
 import com.security.rakshakx.call.callanalysis.RiskConfig
@@ -43,6 +46,7 @@ class RakshakXActivity : AppCompatActivity() {
     private lateinit var repository: CallAnalysisRepository
     private val recorder = CallAudioRecorder(this)
     private val transcriber by lazy { WhisperLiteTranscriber(this) }
+    private val liveSpeechTranscriber by lazy { AndroidSpeechTranscriber(this) }
     private val classifier = FraudIntentClassifier()
     private val engine = PreActionDecisionEngine()
 
@@ -114,6 +118,10 @@ class RakshakXActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
+        findViewById<MaterialButton>(R.id.btnLiveAudioDebug).setOnClickListener {
+            showLiveAudioDebugDialog()
+        }
+
         checkAndRequestPermissions()
         ensureReadPhoneStatePermission()
 
@@ -143,6 +151,39 @@ class RakshakXActivity : AppCompatActivity() {
             }
         } else {
             tvCapabilityStatus.visibility = android.view.View.GONE
+        }
+    }
+
+    private fun showLiveAudioDebugDialog() {
+        val whisperAvailable = transcriber.isModelAvailable()
+        val speechRecognizerAvailable = liveSpeechTranscriber.isAvailable()
+        val micRoutingAvailable = hasRecordAudioPermission() && isSpeakerRoutingAvailable()
+        val callRecordingAllowed = DeviceCapabilities.supportsCallRecording(this)
+
+        val message = buildString {
+            appendLine("Whisper model: ${if (whisperAvailable) "available" else "missing"}")
+            appendLine("SpeechRecognizer: ${if (speechRecognizerAvailable) "available" else "unavailable"}")
+            appendLine("Speaker routing: ${if (micRoutingAvailable) "available" else "limited"}")
+            appendLine("Call capture probe: ${if (callRecordingAllowed) "supported" else "blocked"}")
+            appendLine()
+            appendLine("If Whisper is missing, the app falls back to SpeechRecognizer.")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Live Audio Debug")
+            .setMessage(message)
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private fun isSpeakerRoutingAvailable(): Boolean {
+        val audioManager = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audioManager.availableCommunicationDevices.any { device ->
+                device.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            }
+        } else {
+            true
         }
     }
 

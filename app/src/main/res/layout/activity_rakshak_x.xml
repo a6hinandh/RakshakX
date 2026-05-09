@@ -22,6 +22,19 @@
         tools:visibility="visible"
         tools:text="✅ Live call analysis is supported on this device." />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnLiveAudioDebug"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="LIVE AUDIO DEBUG"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#0B1120"
+        app:cornerRadius="14dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvCapabilityStatus" />
+
     <!-- Log Section Label -->
     <TextView
         android:id="@+id/labelLogs"
@@ -33,7 +46,7 @@
         android:textSize="12sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvCapabilityStatus" />
+        app:layout_constraintTop_toBottomOf="@id/btnLiveAudioDebug" />
 
     <!-- Log Container -->
     <com.google.android.material.card.MaterialCardView

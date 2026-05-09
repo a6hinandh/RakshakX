@@ -34,6 +34,14 @@ class CallOverlayActivity : AppCompatActivity() {
         private const val TAG = "CallOverlayActivity"
         const val ACTION_TRANSCRIPT_UPDATE = "com.security.rakshakx.TRANSCRIPT_UPDATE"
         const val EXTRA_TRANSCRIPT = "extra_transcript"
+        const val ACTION_ANALYSIS_UPDATE = "com.security.rakshakx.ANALYSIS_UPDATE"
+        const val EXTRA_RISK_SCORE = "extra_risk_score"
+        const val EXTRA_RISK_LABEL = "extra_risk_label"
+        const val EXTRA_RISK_REASON = "extra_risk_reason"
+        const val ACTION_CAPTURE_UPDATE = "com.security.rakshakx.CAPTURE_UPDATE"
+        const val EXTRA_CAPTURE_STATUS = "extra_capture_status"
+        const val ACTION_CAPTURE_SOURCE_UPDATE = "com.security.rakshakx.CAPTURE_SOURCE_UPDATE"
+        const val EXTRA_CAPTURE_SOURCE = "extra_capture_source"
     }
 
     private lateinit var windowManager: WindowManager
@@ -50,6 +58,28 @@ class CallOverlayActivity : AppCompatActivity() {
         }
     }
 
+    private val analysisReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val score = intent?.getFloatExtra(EXTRA_RISK_SCORE, -1f) ?: -1f
+            val label = intent?.getStringExtra(EXTRA_RISK_LABEL) ?: ""
+            updateRiskUi(score, label)
+        }
+    }
+
+    private val captureReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val status = intent?.getStringExtra(EXTRA_CAPTURE_STATUS) ?: "Capture: idle"
+            updateCaptureStatus(status)
+        }
+    }
+
+    private val captureSourceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val source = intent?.getStringExtra(EXTRA_CAPTURE_SOURCE) ?: "Source: --"
+            updateCaptureSource(source)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -57,7 +87,10 @@ class CallOverlayActivity : AppCompatActivity() {
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        registerReceiver(transcriptReceiver, IntentFilter(ACTION_TRANSCRIPT_UPDATE))
+        registerOverlayReceiver(transcriptReceiver, ACTION_TRANSCRIPT_UPDATE)
+        registerOverlayReceiver(analysisReceiver, ACTION_ANALYSIS_UPDATE)
+        registerOverlayReceiver(captureReceiver, ACTION_CAPTURE_UPDATE)
+        registerOverlayReceiver(captureSourceReceiver, ACTION_CAPTURE_SOURCE_UPDATE)
         
         showFloatingWidget()
     }
@@ -132,26 +165,32 @@ class CallOverlayActivity : AppCompatActivity() {
         tvStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
         llAnalysis.visibility = View.VISIBLE
         llAnalysis.findViewById<TextView>(R.id.tvTranscript)?.text = "Listening..."
+        llAnalysis.findViewById<TextView>(R.id.tvRiskStatus)?.text = "Risk: --"
+        llAnalysis.findViewById<TextView>(R.id.tvCaptureStatus)?.text = "Capture: speakerphone + mic active"
+        llAnalysis.findViewById<TextView>(R.id.tvCaptureSource)?.text = "Source: --"
         tvSpeakerBadge.visibility = View.VISIBLE
 
         // 1. Force Speakerphone
-        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = true
+        val speakerEnabled = enableSpeakerphone()
         
         // 2. Start Recording Service
         CallRecordingService.startRecording(this, phoneNumber)
         
-        Toast.makeText(this, "Speakerphone ON - Intercepting...", Toast.LENGTH_SHORT).show()
+        if (speakerEnabled) {
+            Toast.makeText(this, "Speakerphone ON - Intercepting...", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Enable speakerphone for better capture", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun stopInterception(tvSpeakerBadge: TextView) {
         if (!isIntercepting) return
         
         isIntercepting = false
-        audioManager.isSpeakerphoneOn = false
-        audioManager.mode = AudioManager.MODE_NORMAL
+        disableSpeakerphone()
 
         tvSpeakerBadge.visibility = View.GONE
+        updateCaptureStatus("Capture: idle")
         
         CallRecordingService.stopRecording(this)
     }
@@ -163,6 +202,57 @@ class CallOverlayActivity : AppCompatActivity() {
             if (transcript.isNotBlank()) {
                 triggerTranscriptHaptic()
             }
+        }
+    }
+
+    private fun updateRiskUi(score: Float, label: String) {
+        floatingView?.let {
+            val tvRisk = it.findViewById<TextView>(R.id.tvRiskStatus)
+            if (score < 0f) {
+                tvRisk.text = "Risk: --"
+                return
+            }
+            val percent = (score * 100).toInt().coerceIn(0, 100)
+            val tag = if (label.isBlank()) "UNKNOWN" else label
+            tvRisk.text = "Risk: ${percent}% ($tag)"
+        }
+    }
+
+    private fun updateCaptureStatus(text: String) {
+        floatingView?.findViewById<TextView>(R.id.tvCaptureStatus)?.text = text
+    }
+
+    private fun updateCaptureSource(text: String) {
+        floatingView?.findViewById<TextView>(R.id.tvCaptureSource)?.text = text
+    }
+
+    private fun enableSpeakerphone(): Boolean {
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val speaker = audioManager.availableCommunicationDevices
+                .firstOrNull { it.type == android.media.AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+            if (speaker != null) {
+                audioManager.setCommunicationDevice(speaker)
+            }
+        }
+        return audioManager.isSpeakerphoneOn
+    }
+
+    private fun disableSpeakerphone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audioManager.clearCommunicationDevice()
+        }
+        audioManager.isSpeakerphoneOn = false
+        audioManager.mode = AudioManager.MODE_NORMAL
+    }
+
+    private fun registerOverlayReceiver(receiver: BroadcastReceiver, action: String) {
+        val filter = IntentFilter(action)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
         }
     }
 
@@ -198,6 +288,9 @@ class CallOverlayActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(transcriptReceiver)
+        unregisterReceiver(analysisReceiver)
+        unregisterReceiver(captureReceiver)
+        unregisterReceiver(captureSourceReceiver)
         floatingView?.findViewById<TextView>(R.id.tvSpeakerBadge)?.let { badge ->
             stopInterception(badge)
         }

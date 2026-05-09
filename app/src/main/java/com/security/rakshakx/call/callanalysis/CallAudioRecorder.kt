@@ -40,18 +40,19 @@ class CallAudioRecorder(private val context: Context? = null) {
             val audioDir = getAudioDir()
             outputFile = File(audioDir, "call_${System.currentTimeMillis()}.pcm")
 
-            val bufferSize = AudioRecord.getMinBufferSize(
+            val bufferSizeBytes = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT
             )
+            val bufferSizeShorts = (bufferSizeBytes / 2).coerceAtLeast(1)
 
             audioRecord = AudioRecord(
                 MediaRecorder.AudioSource.MIC,
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT,
-                bufferSize
+                bufferSizeBytes
             )
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
@@ -66,13 +67,24 @@ class CallAudioRecorder(private val context: Context? = null) {
             val fos = FileOutputStream(outputFile)
             Thread {
                 try {
-                    val data = ShortArray(bufferSize)
+                    val data = ShortArray(bufferSizeShorts)
+                    var emptyReads = 0
                     while (isRecording) {
-                        val read = audioRecord?.read(data, 0, bufferSize) ?: 0
-                        if (read <= 0) {
+                        val read = audioRecord?.read(data, 0, bufferSizeShorts) ?: 0
+                        if (read == 0) {
+                            emptyReads += 1
+                            if (emptyReads >= 50) {
+                                Log.w(TAG, "AudioRecord read returned 0 for too long, stopping recording loop")
+                                break
+                            }
+                            Thread.sleep(10)
+                            continue
+                        }
+                        if (read < 0) {
                             Log.e(TAG, "AudioRecord read failed with code $read, stopping recording loop")
                             break
                         }
+                        emptyReads = 0
                         val byteData = pcmToByteArray(data, read)
                         fos.write(byteData)
                     }

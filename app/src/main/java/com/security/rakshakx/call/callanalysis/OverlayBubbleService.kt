@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.media.AudioManager
+import android.media.AudioDeviceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -47,6 +48,28 @@ class OverlayBubbleService : Service() {
         }
     }
 
+    private val analysisReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val score = intent?.getFloatExtra(CallOverlayActivity.EXTRA_RISK_SCORE, -1f) ?: -1f
+            val label = intent?.getStringExtra(CallOverlayActivity.EXTRA_RISK_LABEL) ?: ""
+            updateRiskUi(score, label)
+        }
+    }
+
+    private val captureReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val status = intent?.getStringExtra(CallOverlayActivity.EXTRA_CAPTURE_STATUS) ?: "Capture: idle"
+            updateCaptureStatus(status)
+        }
+    }
+
+    private val captureSourceReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val source = intent?.getStringExtra(CallOverlayActivity.EXTRA_CAPTURE_SOURCE) ?: "Source: --"
+            updateCaptureSource(source)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -56,8 +79,14 @@ class OverlayBubbleService : Service() {
         val filter = IntentFilter(CallOverlayActivity.ACTION_TRANSCRIPT_UPDATE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(transcriptReceiver, filter, Context.RECEIVER_EXPORTED)
+            registerReceiver(analysisReceiver, IntentFilter(CallOverlayActivity.ACTION_ANALYSIS_UPDATE), Context.RECEIVER_EXPORTED)
+            registerReceiver(captureReceiver, IntentFilter(CallOverlayActivity.ACTION_CAPTURE_UPDATE), Context.RECEIVER_EXPORTED)
+            registerReceiver(captureSourceReceiver, IntentFilter(CallOverlayActivity.ACTION_CAPTURE_SOURCE_UPDATE), Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(transcriptReceiver, filter)
+            registerReceiver(analysisReceiver, IntentFilter(CallOverlayActivity.ACTION_ANALYSIS_UPDATE))
+            registerReceiver(captureReceiver, IntentFilter(CallOverlayActivity.ACTION_CAPTURE_UPDATE))
+            registerReceiver(captureSourceReceiver, IntentFilter(CallOverlayActivity.ACTION_CAPTURE_SOURCE_UPDATE))
         }
     }
 
@@ -139,11 +168,13 @@ class OverlayBubbleService : Service() {
         tvStatus.setTextColor(ContextCompat.getColor(this, R.color.cyan_400))
         llAnalysis.visibility = View.VISIBLE
         llAnalysis.findViewById<TextView>(R.id.tvTranscript)?.text = "Listening..."
+        llAnalysis.findViewById<TextView>(R.id.tvRiskStatus)?.text = "Risk: --"
+        llAnalysis.findViewById<TextView>(R.id.tvCaptureStatus)?.text = "Capture: speakerphone + mic active"
+        llAnalysis.findViewById<TextView>(R.id.tvCaptureSource)?.text = "Source: --"
         tvSpeakerBadge.visibility = View.VISIBLE
 
         // Force Speakerphone
-        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-        audioManager.isSpeakerphoneOn = true
+        enableSpeakerphone()
         
         CallRecordingService.startRecording(this, phoneNumber)
     }
@@ -154,8 +185,7 @@ class OverlayBubbleService : Service() {
         tvSpeakerBadge: TextView
     ) {
         isIntercepting = false
-        audioManager.isSpeakerphoneOn = false
-        audioManager.mode = AudioManager.MODE_NORMAL
+        disableSpeakerphone()
         
         tvStatus.text = "Ready for interception"
         tvStatus.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
@@ -173,6 +203,47 @@ class OverlayBubbleService : Service() {
                 triggerTranscriptHaptic()
             }
         }
+    }
+
+    private fun updateRiskUi(score: Float, label: String) {
+        overlayView?.let {
+            val tvRisk = it.findViewById<TextView>(R.id.tvRiskStatus)
+            if (score < 0f) {
+                tvRisk.text = "Risk: --"
+                return
+            }
+            val percent = (score * 100).toInt().coerceIn(0, 100)
+            val tag = if (label.isBlank()) "UNKNOWN" else label
+            tvRisk.text = "Risk: ${percent}% ($tag)"
+        }
+    }
+
+    private fun updateCaptureStatus(text: String) {
+        overlayView?.findViewById<TextView>(R.id.tvCaptureStatus)?.text = text
+    }
+
+    private fun updateCaptureSource(text: String) {
+        overlayView?.findViewById<TextView>(R.id.tvCaptureSource)?.text = text
+    }
+
+    private fun enableSpeakerphone() {
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val speaker = audioManager.availableCommunicationDevices
+                .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+            if (speaker != null) {
+                audioManager.setCommunicationDevice(speaker)
+            }
+        }
+    }
+
+    private fun disableSpeakerphone() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            audioManager.clearCommunicationDevice()
+        }
+        audioManager.isSpeakerphoneOn = false
+        audioManager.mode = AudioManager.MODE_NORMAL
     }
 
     private fun triggerTranscriptHaptic() {
@@ -206,9 +277,11 @@ class OverlayBubbleService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(transcriptReceiver)
+        unregisterReceiver(analysisReceiver)
+        unregisterReceiver(captureReceiver)
+        unregisterReceiver(captureSourceReceiver)
         if (isIntercepting) {
-            audioManager.isSpeakerphoneOn = false
-            audioManager.mode = AudioManager.MODE_NORMAL
+            disableSpeakerphone()
             CallRecordingService.stopRecording(this)
         }
         overlayView?.let {

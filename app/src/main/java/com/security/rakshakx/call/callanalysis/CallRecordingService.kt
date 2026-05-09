@@ -60,12 +60,14 @@ class CallRecordingService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private lateinit var recorder: CallAudioRecorder
     private lateinit var transcriber: WhisperTranscriber
+    private lateinit var speechTranscriber: AndroidSpeechTranscriber
     private lateinit var classifier: FraudIntentClassifier
     private lateinit var mlClassifier: FraudMLClassifier
     private lateinit var engine: PreActionDecisionEngine
 
     // ML model dependencies (pluggable for testing)
     private val fraudTextModel: FraudTextModel by lazy { DummyFraudTextModel() }
+    private var useSpeechFallback = false
 
     override fun onCreate() {
         super.onCreate()
@@ -73,6 +75,7 @@ class CallRecordingService : Service() {
 
         recorder = CallAudioRecorder(this)
         transcriber = WhisperTranscriber(this)
+        speechTranscriber = AndroidSpeechTranscriber(this)
         classifier = FraudIntentClassifier()
         mlClassifier = FraudMLClassifier(fraudTextModel)  // Inject pluggable model
         engine = PreActionDecisionEngine()
@@ -120,21 +123,45 @@ class CallRecordingService : Service() {
                     return@launch
                 }
 
+                useSpeechFallback = !transcriber.isModelAvailable()
+                if (useSpeechFallback && !speechTranscriber.isAvailable()) {
+                    Log.e(TAG, "No ASR engine available: Whisper model missing and SpeechRecognizer unavailable")
+                    stopSelf()
+                    return@launch
+                }
+
+                val captureStatus = if (useSpeechFallback) {
+                    "Capture: SpeechRecognizer fallback active"
+                } else {
+                    "Capture: Whisper model active"
+                }
+                val captureSource = if (useSpeechFallback) {
+                    "Source: SpeechRecognizer"
+                } else {
+                    "Source: Whisper TFLite"
+                }
+                broadcastCaptureStatus(captureStatus)
+                broadcastCaptureSource(captureSource)
+
                 // Update notification
                 updateNotification(phoneNumber, "Listening for fraud patterns...")
 
                 // Continuous Interception Loop
                 while (isActive) {
-                    // 1. Record a 5-second chunk
-                    val audioPath = recorder.startPcmRecording() ?: break
-                    delay(5000)
-                    recorder.stopRecording()
+                    val transcript = if (useSpeechFallback) {
+                        speechTranscriber.transcribeOnce(5000)
+                    } else {
+                        // 1. Record a 5-second chunk
+                        recorder.startPcmRecording() ?: break
+                        delay(5000)
+                        recorder.stopRecording()
 
-                    // 2. Transcribe Chunk
-                    val pcmData = recorder.getPcmData() ?: continue
-                    val transcript = try {
-                        withTimeout(5000) { transcriber.transcribePcm(pcmData) }
-                    } catch (_: Exception) { "" }
+                        // 2. Transcribe Chunk
+                        val pcmData = recorder.getPcmData() ?: continue
+                        try {
+                            withTimeout(5000) { transcriber.transcribePcm(pcmData) }
+                        } catch (_: Exception) { "" }
+                    }
 
                     if (transcript.isNotBlank()) {
                         // 3. Broadcast to Overlay
@@ -146,6 +173,28 @@ class CallRecordingService : Service() {
                         // 4. Hybrid Analysis
                         val mlResult = mlClassifier.computeMLResult(transcript)
                         val (hybridScore, explanation) = classifier.computeHybridScore(transcript, mlResult)
+
+                        val analysisIntent = Intent(CallOverlayActivity.ACTION_ANALYSIS_UPDATE).apply {
+                            putExtra(CallOverlayActivity.EXTRA_RISK_SCORE, hybridScore)
+                            putExtra(CallOverlayActivity.EXTRA_RISK_LABEL, engine.decideAction(hybridScore).action.name)
+                            putExtra(CallOverlayActivity.EXTRA_RISK_REASON, explanation)
+                        }
+                        sendBroadcast(analysisIntent)
+
+                        broadcastCaptureStatus(
+                            if (useSpeechFallback) {
+                                "Capture: SpeechRecognizer fallback active"
+                            } else {
+                                "Capture: Whisper model active"
+                            }
+                        )
+                        broadcastCaptureSource(
+                            if (useSpeechFallback) {
+                                "Source: SpeechRecognizer"
+                            } else {
+                                "Source: Whisper TFLite"
+                            }
+                        )
 
                         Log.d(TAG, "Live Analysis: score=$hybridScore, transcript=$transcript")
 
@@ -227,6 +276,20 @@ class CallRecordingService : Service() {
         val notification = createNotification(phoneNumber, status)
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun broadcastCaptureStatus(status: String) {
+        val intent = Intent(CallOverlayActivity.ACTION_CAPTURE_UPDATE).apply {
+            putExtra(CallOverlayActivity.EXTRA_CAPTURE_STATUS, status)
+        }
+        sendBroadcast(intent)
+    }
+
+    private fun broadcastCaptureSource(source: String) {
+        val intent = Intent(CallOverlayActivity.ACTION_CAPTURE_SOURCE_UPDATE).apply {
+            putExtra(CallOverlayActivity.EXTRA_CAPTURE_SOURCE, source)
+        }
+        sendBroadcast(intent)
     }
 
     /**

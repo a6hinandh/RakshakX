@@ -19,8 +19,18 @@ class WhisperLiteTranscriber(private val context: Context) {
 
     companion object {
         private const val TAG = "WhisperLiteTranscriber"
+        private const val WHISPER_MODEL_PATH = "models/whisper_tiny_quant.tflite"
         // Model loading: in production, load actual model from assets
         // private val whisperModel = loadWhisperModel(context)
+    }
+
+    fun isModelAvailable(): Boolean {
+        return try {
+            context.assets.open(WHISPER_MODEL_PATH).use { }
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**

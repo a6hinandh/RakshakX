@@ -6,7 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
-import java.nio.MappedByteBuffer
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.FileChannel
 import java.util.concurrent.CancellationException
 
@@ -28,6 +29,9 @@ class WhisperTranscriber(private val context: Context) {
 
     private var interpreter: Interpreter? = null
     private var isInitialized = false
+    private var modelChecked = false
+    private var modelAvailable = false
+    private var missingModelLogged = false
 
     /**
      * Initialize the TFLite interpreter.
@@ -35,6 +39,7 @@ class WhisperTranscriber(private val context: Context) {
     @Synchronized
     private fun initialize(): Boolean {
         if (isInitialized) return true
+        if (!isModelAvailable()) return false
 
         return try {
             val modelBuffer = loadModelFile()
@@ -51,6 +56,26 @@ class WhisperTranscriber(private val context: Context) {
             Log.e(TAG, "Failed to load Whisper TFLite model", e)
             false
         }
+    }
+
+    fun isModelAvailable(): Boolean {
+        if (modelChecked) return modelAvailable
+
+        modelAvailable = try {
+            context.assets.open(MODEL_PATH).close()
+            true
+        } catch (e: Exception) {
+            false
+        }
+
+        modelChecked = true
+
+        if (!modelAvailable && !missingModelLogged) {
+            Log.e(TAG, "Whisper model missing at assets/$MODEL_PATH")
+            missingModelLogged = true
+        }
+
+        return modelAvailable
     }
 
     /**
@@ -117,13 +142,23 @@ class WhisperTranscriber(private val context: Context) {
         return Array(1) { Array(80) { FloatArray(3000) } }
     }
 
-    private fun loadModelFile(): MappedByteBuffer {
-        val afd = context.assets.openFd(MODEL_PATH)
-        val inputStream = FileInputStream(afd.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = afd.startOffset
-        val declaredLength = afd.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    private fun loadModelFile(): ByteBuffer {
+        return try {
+            val afd = context.assets.openFd(MODEL_PATH)
+            val inputStream = FileInputStream(afd.fileDescriptor)
+            val fileChannel = inputStream.channel
+            val startOffset = afd.startOffset
+            val declaredLength = afd.declaredLength
+            fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        } catch (e: Exception) {
+            val bytes = context.assets.open(MODEL_PATH).use { it.readBytes() }
+            ByteBuffer.allocateDirect(bytes.size)
+                .order(ByteOrder.nativeOrder())
+                .apply {
+                    put(bytes)
+                    rewind()
+                }
+        }
     }
 
     fun release() {
