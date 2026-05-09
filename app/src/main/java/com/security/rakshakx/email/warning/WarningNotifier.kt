@@ -9,76 +9,87 @@ import com.security.rakshakx.notifications.RakshakNotificationChannels
 
 object WarningNotifier {
 
-    fun showHighRiskWarning(
-
+    fun showRiskWarning(
         context: Context,
-
-        title: String,
-
+        notificationTitle: String,
+        emailTitle: String,
         reasons: List<String>
-
     ) {
 
-        RakshakNotificationChannels.bootstrap(context.applicationContext)
+        RakshakNotificationChannels.bootstrap(
+            context.applicationContext
+        )
 
-        val channelId = RakshakNotificationChannels.EMAIL_PHISHING
+        val channelId =
+            RakshakNotificationChannels.EMAIL_PHISHING
 
         val manager =
-
             context.getSystemService(
                 Context.NOTIFICATION_SERVICE
             ) as NotificationManager
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             manager.getNotificationChannel(channelId) == null
         ) {
+
             val channel = NotificationChannel(
                 channelId,
                 "Fraud Warnings",
                 NotificationManager.IMPORTANCE_HIGH
             )
-            channel.description = "RakshakX phishing alerts"
+
+            channel.description =
+                "RakshakX phishing alerts"
+
             manager.createNotificationChannel(channel)
         }
 
-        // Convert reasons list into readable text
         val reasonText =
-            reasons.joinToString("\n• ", "• ")
-
-        // Build warning notification
-        val notification = NotificationCompat.Builder(
-            context,
-            channelId
-        )
-
-            .setSmallIcon(
-                android.R.drawable.ic_dialog_alert
+            reasons.joinToString(
+                separator = "\n• ",
+                prefix = "• "
             )
 
-            .setContentTitle(
-                "⚠️ HIGH RISK EMAIL DETECTED"
+        val notification =
+            NotificationCompat.Builder(
+                context,
+                channelId
             )
 
-            .setContentText(title)
+                .setSmallIcon(
+                    android.R.drawable.ic_dialog_alert
+                )
 
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText(
-                        "Possible phishing attempt detected.\n\n$reasonText"
-                    )
-            )
+                .setContentTitle(
+                    notificationTitle
+                )
 
-            .setPriority(
-                NotificationCompat.PRIORITY_HIGH
-            )
+                .setContentText(
+                    emailTitle.take(120)
+                )
 
-            .setAutoCancel(true)
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(
+                            "$notificationTitle\n\n$reasonText"
+                        )
+                )
 
-            .build()
+                .setPriority(
+                    NotificationCompat.PRIORITY_HIGH
+                )
 
-        // Show notification
+                .setCategory(
+                    NotificationCompat.CATEGORY_MESSAGE
+                )
+
+                .setAutoCancel(true)
+
+                .build()
+
         manager.notify(
-            9999,
+            System.currentTimeMillis().toInt(),
             notification
         )
     }

@@ -134,48 +134,16 @@ class RakshakNotificationListenerService : NotificationListenerService() {
 
         if (body.isBlank()) return
 
-        when {
+        Log.d(
+            "EMAIL_PIPELINE",
+            "FORCING EMAIL PIPELINE"
+        )
 
-            isSmsAppPackage(pkg) -> {
-
-                runCatching {
-
-                    handleSmsNotification(
-                        pkg,
-                        title,
-                        body
-                    )
-
-                }.onFailure {
-
-                    Log.e(
-                        TAG,
-                        "SMS pipeline failed",
-                        it
-                    )
-                }
-            }
-
-            isEmailAppPackage(pkg) -> {
-
-                runCatching {
-
-                    handleEmailNotification(
-                        pkg,
-                        title,
-                        body
-                    )
-
-                }.onFailure {
-
-                    Log.e(
-                        TAG,
-                        "Email pipeline failed",
-                        it
-                    )
-                }
-            }
-        }
+        handleEmailNotification(
+            pkg,
+            title,
+            body
+        )
     }
 
 
@@ -220,18 +188,34 @@ class RakshakNotificationListenerService : NotificationListenerService() {
             "PROCESSING EMAIL: $title"
         )
 
-        EmailThreatPipeline.process(
+        try {
 
-            context = this,
+            val result = EmailThreatPipeline.process(
 
-            title = title,
+                context = this,
 
-            body = body,
+                title = title,
 
-            persistenceScope = coroutineScope,
+                body = body,
 
-            logPrefix = "Processing Email from: $pkg"
-        )
+                persistenceScope = coroutineScope,
+
+                logPrefix = "Processing Email from: $pkg"
+            )
+
+            Log.d(
+                "EMAIL_PIPELINE",
+                "FINAL RESULT = ${result.riskLevel} score=${result.score}"
+            )
+
+        } catch (e: Exception) {
+
+            Log.e(
+                "EMAIL_PIPELINE",
+                "PIPELINE FAILED",
+                e
+            )
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) { /* no-op */ }

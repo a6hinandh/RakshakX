@@ -77,13 +77,34 @@ Click here before unauthorized login locks you out.""".trimIndent()
         val result = RiskEngine.calculateRisk(features)
         Log.d(TAG, "Email scan result: ${result.riskLevel} score=${result.score}")
 
-        if (result.riskLevel == "HIGH RISK") {
+        if (
+            result.riskLevel == "HIGH RISK"
+            ||
+            result.riskLevel == "MEDIUM RISK"
+        ){
             val combinedReasons = result.reasons + urlReputationReasons + correlationReasons
             if (PermissionManager.hasNotificationPermission(context)) {
-                WarningNotifier.showHighRiskWarning(context, fullText, combinedReasons)
+                WarningNotifier.showRiskWarning(
+
+                    context = context,
+
+                    notificationTitle = if (
+                        result.riskLevel == "HIGH RISK"
+                    ) {
+                        "🚨 HIGH RISK EMAIL DETECTED"
+                    } else {
+                        "⚠ Suspicious Email Detected"
+                    },
+
+                    emailTitle = fullText,
+
+                    reasons = combinedReasons
+                )
             } else {
-                Log.w(TAG, "HIGH RISK but POST_NOTIFICATIONS not granted; skipping alert notification")
-            }
+                Log.w(
+                    TAG,
+                    "${result.riskLevel} but POST_NOTIFICATIONS not granted; skipping alert notification"
+                )}
 
             val appCtx = context.applicationContext
             persistenceScope?.launch(Dispatchers.IO) {
