@@ -1,0 +1,21 @@
+{
+  "distilbert_confidence_threshold": 0.75,
+  "hinglish_threshold": 0.65,
+  "language_detection_threshold": 0.15,
+  "indic_languages": ["hi", "ta", "te", "kn", "ml", "mr", "bn", "gu", "pa", "ur", "or"],
+  "channels": ["sms", "email", "call", "web"],
+  "models": {
+    "distilbert": {
+      "path": "rakshakx_model/distilbert/model.onnx",
+      "vocab": "rakshakx_model/distilbert/vocab.txt",
+      "max_seq_len": 128
+    },
+    "indicbert": {
+      "path": "rakshakx_model/indicbert/model.onnx",
+      "vocab": "rakshakx_model/indicbert/vocab.txt",
+      "max_seq_len": 128
+    }
+  },
+  "labels": ["SAFE", "SCAM", "SUSPICIOUS"],
+  "version": "1.0.0"
+}

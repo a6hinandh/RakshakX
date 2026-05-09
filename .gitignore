@@ -1,15 +1,90 @@
+# IDE and Editor files
 *.iml
-.gradle
-/local.properties
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Gradle build system
+.gradle/
+/build
+/captures
+build/
+gradle-wrapper.properties
+
+# Local configuration
+local.properties
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
+
+# Native builds
 .externalNativeBuild
-.cxx
-local.properties
+.cxx/
+
+# APK files
+*.apk
+*.aab
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# ML Model files (large files - use download script instead)
+ml/output/
+ml/data/
+*.onnx
+*.onnx.data
+*.tflite
+
+# Build outputs
+app/build/
+*.gradle.kts.bak
+
+# Kotlin/Java
+.kotlin/
+out/
+
+# Misc
+*.log
+.env
+.env.local
+.env.*.local
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db

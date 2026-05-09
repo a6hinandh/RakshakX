@@ -3,21 +3,29 @@ package com.security.rakshakx.notifications
 import android.app.Notification
 import android.content.ComponentName
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.security.rakshakx.call.services.foreground.FraudMonitoringForegroundService
+import com.security.rakshakx.email.EmailScamDetector
 import com.security.rakshakx.email.pipeline.EmailThreatPipeline
 import com.security.rakshakx.sms.RiskEngine
 import com.security.rakshakx.sms.SmsDeduplicationGuard
+import com.security.rakshakx.sms.SmsScamDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Single [NotificationListenerService] for SMS + email notification ingress (Android allows one active listener per app).
+ * Single [NotificationListenerService] for SMS + email ingress (Android allows one active listener per app).
+ *
+ * Routes by posting package:
+ * - **SMS** — hybrid ML ([SmsScamDetector]), rule score ([RiskEngine]), fraud alerts,
+ *   and [FraudMonitoringForegroundService] orchestrator for cross-channel correlation.
+ * - **Email** — hybrid ML ([EmailScamDetector]) plus shared [EmailThreatPipeline] (URL/reputation/rules, DB, warnings).
  */
 class RakshakNotificationListenerService : NotificationListenerService() {
 
@@ -53,7 +61,16 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         )
 
         private const val OWN_PACKAGE = "com.security.rakshakx"
+
+        private val EMAIL_IN_TEXT = Regex("\\S+@\\S+\\.\\S+")
     }
+
+    /** Sender / subject / snippet inferred from [Notification.extras] (varies by OEM and mail app). */
+    private data class EmailNotificationIngress(
+        val sender: String,
+        val subject: String,
+        val bodySnippet: String,
+    )
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
 
@@ -100,124 +117,137 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-
-        Log.d("RAKSHAK_LISTENER", "════════════════════")
-        Log.d("RAKSHAK_LISTENER", "NOTIFICATION RECEIVED")
-
         val pkg = sbn.packageName ?: return
-
-        Log.d("RAKSHAK_LISTENER", "PACKAGE = $pkg")
-
         if (pkg == OWN_PACKAGE) return
 
         val extras = sbn.notification.extras ?: return
-
-        val title =
-            extras.getString(Notification.EXTRA_TITLE)
-                ?: "NO TITLE"
-
-        val text =
-            extras.getCharSequence(Notification.EXTRA_TEXT)
-                ?.toString()
-                ?: "NO TEXT"
-
-        val bigText =
-            extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-                ?.toString()
-                ?: "NO BIG TEXT"
-
-        Log.d("RAKSHAK_LISTENER", "TITLE = $title")
-        Log.d("RAKSHAK_LISTENER", "TEXT = $text")
-        Log.d("RAKSHAK_LISTENER", "BIG TEXT = $bigText")
-
+        val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val body = bigText.ifBlank { text }
-        if (
-            title.contains("new messages", true)
-        ) {
-            return
-        }
         if (body.isBlank()) return
 
-        Log.d(
-            "EMAIL_PIPELINE",
-            "FORCING EMAIL PIPELINE"
-        )
-
-        handleEmailNotification(
-            pkg,
-            title,
-            body
-        )
+        when {
+            isSmsAppPackage(pkg) -> {
+                if (title.contains("new messages", ignoreCase = true)) return
+                handleSmsNotification(pkg, title, body)
+            }
+            isEmailAppPackage(pkg) -> {
+                val ingress = extractEmailIngress(extras, pkg, title, body)
+                handleEmailNotification(pkg, ingress)
+            }
+            else -> Log.d(TAG, "Ignoring notification from non-SMS/non-email package: $pkg")
+        }
     }
 
 
 
     private fun handleSmsNotification(pkg: String, title: String, body: String) {
-        Log.d(TAG, "Processing SMS from: $pkg")
+        Log.d(TAG, "Processing SMS notification from: $pkg")
         if (!SmsDeduplicationGuard.shouldProcess(this, title, body)) {
             Log.d(TAG, "Skipping duplicate SMS event from notification path")
             return
         }
-        val risk = RiskEngine.calculate(body, this)
-        if (risk >= RiskEngine.ALERT_THRESHOLD) {
-            SmsFraudNotifications.showFraudAlert(
-                context = this,
-                sender = title,
-                message = body,
-                riskScore = risk,
-                source = "SMS"
-            )
-        }
 
-        if (title.isNotBlank()) {
-            coroutineScope.launch {
-                try {
+        coroutineScope.launch {
+            try {
+                SmsScamDetector(this@RakshakNotificationListenerService).analyze(sender = title, body = body)
+
+                val risk = RiskEngine.calculate(body, this@RakshakNotificationListenerService)
+                if (risk >= RiskEngine.ALERT_THRESHOLD) {
+                    SmsFraudNotifications.showFraudAlert(
+                        context = this@RakshakNotificationListenerService,
+                        sender = title,
+                        message = body,
+                        riskScore = risk,
+                        source = "SMS"
+                    )
+                }
+
+                if (title.isNotBlank()) {
                     val orchestrator = FraudMonitoringForegroundService.getOrchestrator(applicationContext)
                     orchestrator.handleSmsEvent(phoneNumber = title, message = body)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to route to call orchestrator", e)
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process SMS notification pipeline", e)
             }
         }
     }
 
-    private fun handleEmailNotification(
+    private fun handleEmailNotification(pkg: String, ingress: EmailNotificationIngress) {
+        Log.d(TAG, "Processing Email notification from: $pkg (sender=${ingress.sender.take(48)}…)")
+
+        val pipelineTitle = ingress.subject.ifBlank { ingress.bodySnippet.take(120).trim() }
+        val pipelineBody = buildString {
+            val s = ingress.sender
+            if (s.isNotBlank() && !s.equals(pkg, ignoreCase = true)) {
+                append("From: ").appendLine(s)
+            }
+            if (ingress.subject.isNotBlank()) {
+                append("Subject: ").appendLine(ingress.subject)
+            }
+            append(ingress.bodySnippet)
+        }.trim()
+
+        coroutineScope.launch {
+            try {
+                EmailScamDetector(this@RakshakNotificationListenerService).analyze(
+                    sender = ingress.sender.ifBlank { pkg },
+                    subject = ingress.subject,
+                    body = ingress.bodySnippet.ifBlank { pipelineBody }
+                )
+                val result = EmailThreatPipeline.process(
+                    context = this@RakshakNotificationListenerService,
+                    title = pipelineTitle.ifBlank { ingress.sender },
+                    body = pipelineBody.ifBlank { ingress.bodySnippet },
+                    persistenceScope = coroutineScope,
+                    logPrefix = "Processing Email from: $pkg"
+                )
+                Log.d(TAG, "Email ingress result: ${result.riskLevel} score=${result.score}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process email notification pipeline", e)
+            }
+        }
+    }
+
+    /**
+     * Mail apps differ: many use title=sender / text=subject / bigText=snippet;
+     * others put subject in title and sender in [Notification.EXTRA_SUB_TEXT].
+     */
+    private fun extractEmailIngress(
+        extras: Bundle,
         pkg: String,
         title: String,
-        body: String
-    ) {
+        combinedBody: String,
+    ): EmailNotificationIngress {
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim().orEmpty()
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()?.trim().orEmpty()
+        val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim().orEmpty()
+        val summaryText =
+            extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString()?.trim().orEmpty()
 
-        Log.d(
-            "EMAIL_PIPELINE",
-            "PROCESSING EMAIL: $title"
-        )
+        val snippet = bigText.ifBlank { combinedBody }.ifBlank { text }
+        val titleHasEmail = EMAIL_IN_TEXT.containsMatchIn(title)
+        val subHasEmail = EMAIL_IN_TEXT.containsMatchIn(subText)
+        val subProbablySender = subText.isNotBlank() &&
+            subText != title &&
+            (subHasEmail || subText.length <= 72)
 
-        try {
-
-            val result = EmailThreatPipeline.process(
-
-                context = this,
-
-                title = title,
-
-                body = body,
-
-                persistenceScope = coroutineScope,
-
-                logPrefix = "Processing Email from: $pkg"
+        return when {
+            titleHasEmail -> EmailNotificationIngress(
+                sender = title,
+                subject = text.ifBlank { summaryText },
+                bodySnippet = snippet,
             )
-
-            Log.d(
-                "EMAIL_PIPELINE",
-                "FINAL RESULT = ${result.riskLevel} score=${result.score}"
+            subProbablySender && title.isNotBlank() -> EmailNotificationIngress(
+                sender = subText,
+                subject = title,
+                bodySnippet = bigText.ifBlank { text },
             )
-
-        } catch (e: Exception) {
-
-            Log.e(
-                "EMAIL_PIPELINE",
-                "PIPELINE FAILED",
-                e
+            else -> EmailNotificationIngress(
+                sender = title.ifBlank { pkg },
+                subject = text.ifBlank { summaryText },
+                bodySnippet = snippet,
             )
         }
     }

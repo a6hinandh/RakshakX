@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.security.rakshakx.call.callanalysis.CallStateMonitor
 import com.security.rakshakx.call.callanalysis.OverlayBubbleManager
+import com.security.rakshakx.integration.ScamClassifierRouter
 
 /**
  * RakshakXApplication
@@ -24,22 +25,40 @@ class RakshakXApplication : Application() {
     var callStateMonitor: CallStateMonitor? = null
         private set
 
+    companion object {
+        private const val TAG = "RakshakXApplication"
+
+        // Global singleton router — all channel detectors use this
+        var scamRouter: ScamClassifierRouter? = null
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
-        Log.d("RakshakXApplication", "Application onCreate")
+        Log.d(TAG, "Application onCreate")
 
+        // ── ScamClassifierRouter (DistilBERT + IndicBERT) ────────────────────
+        // Initialized here so all channel detectors (SMS, Email, Call, Web)
+        // share one instance. Models load from assets at startup.
+        scamRouter = ScamClassifierRouter(applicationContext)
+
+        // ── CallStateMonitor ─────────────────────────────────────────────────
         // Do NOT start telephony listening here.
         // Just prepare a monitor instance; Activities will start/stop it safely.
         callStateMonitor = CallStateMonitor(
             context = this,
             listener = object : CallStateMonitor.CallStateListener {
+
                 override fun onCallStarted(phoneNumber: String?) {
-                    Log.i("RakshakXApplication", "Call started detected")
-                    OverlayBubbleManager.showBubble(this@RakshakXApplication, phoneNumber)
+                    Log.i(TAG, "Call started detected")
+                    OverlayBubbleManager.showBubble(
+                        this@RakshakXApplication,
+                        phoneNumber
+                    )
                 }
 
                 override fun onCallEnded() {
-                    Log.i("RakshakXApplication", "Call ended detected")
+                    Log.i(TAG, "Call ended detected")
                     OverlayBubbleManager.hideBubble(this@RakshakXApplication)
                 }
             }
@@ -51,7 +70,8 @@ class RakshakXApplication : Application() {
 
     override fun onTerminate() {
         super.onTerminate()
+
         callStateMonitor?.stop()
+        scamRouter?.release()
     }
 }
-
