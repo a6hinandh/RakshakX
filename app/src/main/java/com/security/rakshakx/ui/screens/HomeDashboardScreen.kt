@@ -162,6 +162,62 @@ fun HomeDashboardScreen(
             )
         }
 
+        // ── Web Scanners ──
+        SectionHeader(title = "Web Defense")
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                var manualUrl by remember { mutableStateOf("") }
+                
+                OutlinedTextField(
+                    value = manualUrl,
+                    onValueChange = { manualUrl = it },
+                    label = { Text("Paste URL to scan") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = colors.primary,
+                        unfocusedBorderColor = colors.border,
+                        focusedLabelColor = colors.primary,
+                        unfocusedLabelColor = colors.textSecondary
+                    )
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = {
+                            if (manualUrl.isNotBlank()) {
+                                val intent = Intent(activity, com.security.rakshakx.web.ui.UrlScanActivity::class.java).apply {
+                                    putExtra("EXTRA_URL", manualUrl)
+                                }
+                                activity.startActivity(intent)
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+                    ) {
+                        Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Scan URL")
+                    }
+                    Button(
+                        onClick = {
+                            activity.startActivity(Intent(activity, com.security.rakshakx.web.ui.QrScannerActivity::class.java))
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+                    ) {
+                        Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Scan QR")
+                    }
+                }
+            }
+        }
+
         // ── Recent Threats ──
         if (threats.isNotEmpty()) {
             SectionHeader(

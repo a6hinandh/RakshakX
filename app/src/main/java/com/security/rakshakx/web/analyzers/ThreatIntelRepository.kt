@@ -22,7 +22,7 @@ class ThreatIntelRepository(context: Context) {
     )
     private val defaultBankBrands = setOf(
         "chase", "wellsfargo", "paypal", "visa", "mastercard", "amex", "capitalone",
-        "citibank", "hsbc", "barclays", "icici", "hdfc", "sbi", "axis", "kotak"
+        "citibank", "hsbc", "barclays", "icici", "hdfc", "sbi", "axis", "kotak", "rakshak"
     )
     private val defaultShorteners = setOf(
         "bit.ly", "tinyurl.com", "t.co", "goo.gl", "is.gd", "cutt.ly", "rebrand.ly",

@@ -23,6 +23,10 @@
     <uses-feature
         android:name="android.hardware.telephony"
         android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <!-- Optional browser package visibility -->
     <queries>
@@ -98,6 +102,29 @@
         <!-- SMS -->
         <activity
             android:name=".sms.SmsMainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX" />
+
+        <!-- Web URL Scan (Copy/Paste Context Menu) -->
+        <activity
+            android:name=".web.ui.UrlScanActivity"
+            android:exported="true"
+            android:theme="@style/Theme.RakshakX.Transparent"
+            android:label="RakshakX Scan">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".web.ui.QrScannerActivity"
             android:exported="false"
             android:theme="@style/Theme.RakshakX" />
 

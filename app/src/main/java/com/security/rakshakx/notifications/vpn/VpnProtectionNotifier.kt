@@ -28,17 +28,28 @@ class VpnProtectionNotifier(private val context: Context) {
     fun buildThreatAlert(message: String): Notification {
         return NotificationCompat.Builder(context, RakshakNotificationChannels.VPN)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Threat blocked")
-            .setContentText(message)
+            .setContentTitle("RakshakX Threat Blocked")
+            .setContentText(message.substringBefore(" | "))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
     }
 
-    fun notifyThreat(message: String) {
+    fun notifyThreat(title: String, message: String) {
         if (!PermissionManager.hasNotificationPermission(context)) {
             return
         }
-        manager.notify(THREAT_NOTIFICATION_ID, buildThreatAlert(message))
+        val notification = NotificationCompat.Builder(context, RakshakNotificationChannels.VPN)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(message.substringBefore("\n"))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+            
+        manager.notify(THREAT_NOTIFICATION_ID, notification)
     }
 
     companion object {

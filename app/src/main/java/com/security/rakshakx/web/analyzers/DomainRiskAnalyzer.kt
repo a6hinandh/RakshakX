@@ -27,6 +27,9 @@ class DomainRiskAnalyzer(private val intelRepository: ThreatIntelRepository) {
         paymentField: Boolean = false,
         domainAgeDays: Int? = null
     ): ThreatAssessment {
+        val riskyServices = setOf("vercel.app", "github.io", "firebaseapp.com", "netlify.app", "pages.dev", "herokuapp.com")
+        val securityKeywords = setOf("secure", "verify", "verification", "login", "auth", "account", "update", "banking", "kyc")
+        
         val reasons = mutableListOf<String>()
         val normalized = domain.lowercase(Locale.US)
         val tld = normalized.substringAfterLast('.', "")
@@ -50,8 +53,26 @@ class DomainRiskAnalyzer(private val intelRepository: ThreatIntelRepository) {
         if (intelRepository.bankBrandKeywords().any { normalized.contains(it) } &&
             !intelRepository.isAllowListed(normalized)
         ) {
-            score += 15
-            reasons.add("Possible brand impersonation")
+            score += 35 // Increased from 15
+            reasons.add("Probable brand impersonation detected")
+        }
+
+        // Check for brand keywords on free/risky hosting services
+        if (riskyServices.any { normalized.endsWith(it) }) {
+            val hasBrand = intelRepository.bankBrandKeywords().any { normalized.substringBefore(it).isNotBlank() && normalized.contains(it) }
+            val hasSecurityWord = securityKeywords.any { normalized.contains(it) }
+            
+            if (hasBrand || hasSecurityWord) {
+                score += 30
+                reasons.add("Suspicious subdomain on free hosting")
+            }
+        }
+
+        // Check for multiple security keywords in domain
+        val securityHits = securityKeywords.count { normalized.contains(it) }
+        if (securityHits >= 2) {
+            score += 20
+            reasons.add("Multiple deceptive keywords in domain")
         }
 
         if (normalized.contains("xn--")) {

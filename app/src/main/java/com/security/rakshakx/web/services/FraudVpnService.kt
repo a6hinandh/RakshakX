@@ -217,14 +217,15 @@ class FraudVpnService : VpnService() {
             }
 
             val displayDomain = pickDisplayDomain(finalAssessment.domain, session)
+            val score = fraudResult?.score ?: 0
+            val category = formatCategory(fraudResult?.category?.name ?: "UNKNOWN")
+            val reasons = finalAssessment.reasons.joinToString("\n• ")
+            val detailMessage = "Category: $category\nScore: $score\nReasons:\n• $reasons"
+
             if (blockingEngine.shouldBlock(finalAssessment.domain, action)) {
-                val score = fraudResult?.score ?: 0
-                val category = formatCategory(fraudResult?.category?.name ?: "UNKNOWN")
-                notifier.notifyThreat("Blocked $displayDomain | $category | Score $score")
+                notifier.notifyThreat("RakshakX Blocked $displayDomain", detailMessage)
             } else if (action == FraudAction.WARN) {
-                val score = fraudResult?.score ?: 0
-                val category = formatCategory(fraudResult?.category?.name ?: "SUSPICIOUS")
-                notifier.notifyThreat("Warning $displayDomain | $category | Score $score")
+                notifier.notifyThreat("RakshakX Warning: $displayDomain", detailMessage)
             }
         }
     }
