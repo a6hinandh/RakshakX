@@ -69,6 +69,9 @@ ml/output/
 ml/data/
 *.onnx
 *.onnx.data
+# Ship production ONNX in-app via Git LFS (see .gitattributes); still ignore random .onnx elsewhere
+!app/src/main/assets/rakshakx_model/**/model.onnx
+!app/src/main/assets/rakshakx_model/**/*.onnx.data
 *.tflite
 
 # Build outputs

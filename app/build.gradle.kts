@@ -162,3 +162,34 @@ dependencies {
         libs.androidx.compose.ui.tooling
     )
 }
+
+tasks.register("verifyRakshakOnnxAssets") {
+    group = "verification"
+    description =
+        "Fails fast if ONNX weights are missing from assets (run: python ml/copy_to_assets.py)"
+    doLast {
+        val base = layout.projectDirectory.dir("src/main/assets/rakshakx_model")
+        val required = listOf(
+            "distilbert/model.onnx" to 1_000_000L,
+            "indicbert/model.onnx" to 500_000L,
+        )
+        for ((rel, minBytes) in required) {
+            val f = base.file(rel).asFile
+            if (!f.isFile) {
+                throw GradleException(
+                    "Missing $rel under ${base.asFile}. Train or copy models into assets:\n" +
+                        "  python ml/copy_to_assets.py"
+                )
+            }
+            if (f.length() < minBytes) {
+                throw GradleException(
+                    "${f.invariantSeparatorsPath} is too small (${f.length()} bytes); expected real ONNX weights."
+                )
+            }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("verifyRakshakOnnxAssets")
+}
