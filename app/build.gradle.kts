@@ -102,6 +102,10 @@ dependencies {
 
     implementation(libs.androidx.security.crypto)
 
+    // On-device AI
+    implementation(libs.tensorflow.lite)
+    implementation(libs.onnxruntime.android)
+
     // Testing
     testImplementation(libs.junit)
 

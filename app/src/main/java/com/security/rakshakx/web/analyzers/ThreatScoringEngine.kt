@@ -16,6 +16,7 @@ class ThreatScoringEngine(private val intelRepository: ThreatIntelRepository) {
         val dnsScore: Int,
         val tlsScore: Int,
         val paymentScore: Int,
+        val aiScore: Int,
         val reasons: List<String>,
         val visibleSignals: List<String>,
         val correlationData: String,
@@ -24,7 +25,8 @@ class ThreatScoringEngine(private val intelRepository: ThreatIntelRepository) {
 
     fun score(input: FraudSignalInput): FraudRiskResult {
         val total = (input.domainScore + input.languageScore + input.fieldScore + input.redirectScore +
-            input.mismatchScore + input.dnsScore + input.tlsScore + input.paymentScore).coerceIn(0, 100)
+            input.mismatchScore + input.dnsScore + input.tlsScore + input.paymentScore + input.aiScore)
+            .coerceIn(0, 100)
 
         val severity = pickSeverity(total)
         val category = pickCategory(input, total)
