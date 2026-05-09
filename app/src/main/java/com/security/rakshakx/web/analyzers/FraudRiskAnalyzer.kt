@@ -1,5 +1,6 @@
 package com.security.rakshakx.web.analyzers
 
+import com.security.rakshakx.web.ai.AiThreatScorer
 import com.security.rakshakx.web.models.BrowserSessionData
 import com.security.rakshakx.web.models.FraudCategory
 import com.security.rakshakx.web.models.FraudRiskResult
@@ -11,7 +12,8 @@ import java.util.Locale
 class FraudRiskAnalyzer(
     private val intelRepository: ThreatIntelRepository,
     private val scamLanguageAnalyzer: ScamLanguageAnalyzer,
-    private val scoringEngine: ThreatScoringEngine
+    private val scoringEngine: ThreatScoringEngine,
+    private val aiThreatScorer: AiThreatScorer?
 ) {
     fun analyze(
         session: BrowserSessionData,
@@ -104,6 +106,13 @@ class FraudRiskAnalyzer(
             0
         }
 
+        val aiProbability = aiThreatScorer?.score(session, traffic, domainAssessment)
+        val aiScore = ((aiProbability ?: 0f) * 40f).toInt().coerceIn(0, 40)
+        if (aiProbability != null && aiProbability >= 0.6f) {
+            reasons.add("AI fraud probability ${String.format(Locale.US, "%.2f", aiProbability)}")
+            visibleSignals.add("AI risk score ${String.format(Locale.US, "%.0f", aiProbability * 100)}")
+        }
+
         if (intelRepository.bankBrandKeywords().any { combinedText.lowercase().contains(it) }) {
             categoryHints.add(FraudCategory.BANKING_FRAUD)
         }
@@ -123,6 +132,7 @@ class FraudRiskAnalyzer(
             dnsScore = dnsScore,
             tlsScore = tlsScore,
             paymentScore = paymentScore,
+            aiScore = aiScore,
             reasons = reasons.distinct(),
             visibleSignals = visibleSignals.distinct(),
             correlationData = correlationData,

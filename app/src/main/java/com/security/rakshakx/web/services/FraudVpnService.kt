@@ -9,6 +9,9 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.security.rakshakx.MainActivity
+import com.security.rakshakx.web.ai.AiThreatScorer
+import com.security.rakshakx.web.ai.FraudTextPreprocessor
+import com.security.rakshakx.web.ai.ModelManager
 import com.security.rakshakx.web.analyzers.FraudRiskAnalyzer
 import com.security.rakshakx.web.analyzers.ScamLanguageAnalyzer
 import com.security.rakshakx.web.analyzers.BrowserNetworkCorrelationEngine
@@ -49,6 +52,7 @@ class FraudVpnService : VpnService() {
     private lateinit var threatScoringEngine: ThreatScoringEngine
     private lateinit var intelRepository: ThreatIntelRepository
     private val scamLanguageAnalyzer = ScamLanguageAnalyzer()
+    private var modelManager: ModelManager? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -56,7 +60,13 @@ class FraudVpnService : VpnService() {
         threatScoringEngine = ThreatScoringEngine(intelRepository)
         riskAnalyzer = DomainRiskAnalyzer(intelRepository)
         correlationEngine = BrowserNetworkCorrelationEngine(intelRepository)
-        fraudRiskAnalyzer = FraudRiskAnalyzer(intelRepository, scamLanguageAnalyzer, threatScoringEngine)
+        val aiScorer = buildAiScorer()
+        fraudRiskAnalyzer = FraudRiskAnalyzer(
+            intelRepository,
+            scamLanguageAnalyzer,
+            threatScoringEngine,
+            aiScorer
+        )
         notifier = VpnProtectionNotifier(this)
         notifier.createChannel()
         threatLogger = VpnThreatLogger(this)
@@ -86,6 +96,7 @@ class FraudVpnService : VpnService() {
 
     override fun onDestroy() {
         stopVpn()
+        modelManager?.close()
         super.onDestroy()
     }
 
@@ -246,6 +257,23 @@ class FraudVpnService : VpnService() {
 
     private fun formatCategory(raw: String): String {
         return raw.lowercase().replace('_', ' ').replaceFirstChar { it.uppercase() }
+    }
+
+    private fun buildAiScorer(): AiThreatScorer? {
+        return try {
+            val manager = ModelManager(this)
+            modelManager = manager
+            val model = try {
+                manager.loadTfliteModel()
+            } catch (tfliteError: Exception) {
+                manager.loadOnnxModel()
+            }
+            val preprocessor = FraudTextPreprocessor(this)
+            AiThreatScorer(preprocessor, model)
+        } catch (e: Exception) {
+            Log.w(TAG, "AI models not available; using heuristics only", e)
+            null
+        }
     }
 
     private fun pickHighestRisk(
