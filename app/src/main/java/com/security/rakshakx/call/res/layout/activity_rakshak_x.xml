@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FBFBFB"
+    android:padding="20dp">
+
+    <!-- Capability Status Banner -->
+    <TextView
+        android:id="@+id/tvCapabilityStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:visibility="visible"
+        tools:text="✅ Live call analysis is supported on this device." />
+
+    <!-- Scenario Selection Label -->
+    <TextView
+        android:id="@+id/labelScenarios"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SELECT A TEST SCENARIO"
+        android:textColor="#757575"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:layout_marginTop="16dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvCapabilityStatus" />
+
+    <!-- Scenario Buttons -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnScenario1"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="6dp"
+        android:text="Scenario 1"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#1A237E"
+        app:cornerRadius="12dp"
+        app:layout_constraintEnd_toStartOf="@+id/btnScenario2"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/labelScenarios" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnScenario2"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="6dp"
+        android:text="Scenario 2"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#1A237E"
+        app:cornerRadius="12dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toEndOf="@id/btnScenario1"
+        app:layout_constraintTop_toTopOf="@id/btnScenario1" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnScenario3"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="6dp"
+        android:text="Scenario 3"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#1A237E"
+        app:cornerRadius="12dp"
+        app:layout_constraintEnd_toStartOf="@+id/btnScenario4"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnScenario1" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnScenario4"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="0dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="6dp"
+        android:text="Scenario 4"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#1A237E"
+        app:cornerRadius="12dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_weight="1"
+        app:layout_constraintStart_toEndOf="@id/btnScenario3"
+        app:layout_constraintTop_toTopOf="@id/btnScenario3" />
+
+    <!-- Log Section Label -->
+    <TextView
+        android:id="@+id/labelLogs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="ACTIVITY LOGS"
+        android:textColor="#757575"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnScenario3" />
+
+    <!-- Log Container -->
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:strokeColor="#EEEEEE"
+        app:strokeWidth="1dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/labelLogs">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            tools:listitem="@android:layout/simple_list_item_1" />
+    </com.google.android.material.card.MaterialCardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
