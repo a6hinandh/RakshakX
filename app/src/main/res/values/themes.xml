@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base theme uses dark navy background, no action bar (Compose handles everything) -->
-    <style name="Theme.RakshakX" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Base theme uses dark navy background, no action bar -->
+    <style name="Theme.RakshakX" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/navy_900</item>
         <item name="android:statusBarColor">@color/navy_900</item>
         <item name="android:navigationBarColor">@color/navy_800</item>
+        <item name="colorPrimary">@color/cyan_400</item>
     </style>
 
     <style name="Theme.RakshakX.Transparent" parent="Theme.RakshakX">
@@ -14,5 +15,28 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowIsFloating">true</item>
         <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+    <style name="Theme.RakshakX.Call" parent="Theme.RakshakX">
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="Theme.RakshakX.CallOverlay" parent="Theme.RakshakX.Transparent">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <style name="Theme.RakshakX.FraudAlert" parent="Theme.RakshakX">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+    <style name="Theme.RakshakX.SafeCall" parent="Theme.RakshakX">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
     </style>
 </resources>

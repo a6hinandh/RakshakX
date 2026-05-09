@@ -1,7 +1,6 @@
 package com.security.rakshakx.ui.screens
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,10 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.security.rakshakx.call.CallMainActivity
+import androidx.compose.ui.unit.sp
+import com.security.rakshakx.call.callanalysis.ui.RakshakXActivity
 import com.security.rakshakx.permissions.PermissionManager
 import com.security.rakshakx.sms.SmsMainActivity
 import com.security.rakshakx.ui.components.*
@@ -72,192 +73,430 @@ fun HomeDashboardScreen(
         ChannelStatus(Channel.EMAIL, isActive = readiness.emailReady, threatCount = threats.count { it.channel == Channel.EMAIL }),
     )
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .background(
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(Navy900, Color(0xFF0A0F1D))
+                )
+            )
     ) {
-        // ── Header ──
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Column {
-                Text("🛡️ RakshakX", style = MaterialTheme.typography.headlineMedium, color = colors.primary, fontWeight = FontWeight.Bold)
-                Text("Autonomous Fraud Interception", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+            // ── Premium Header ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "RAKSHAKX",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified
+                        ),
+                        color = colors.primary
+                    )
+                    Text(
+                        text = "NEURAL FRAUD INTERCEPTION",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.textMuted,
+                        letterSpacing = 2.sp
+                    )
+                }
+                IconButton(
+                    onClick = onNavigateToSettings,
+                    modifier = Modifier.background(GlassBg, MaterialTheme.shapes.small)
+                ) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = colors.textSecondary)
+                }
             }
-        }
 
-        // ── Shield Status Hero ──
-        ShieldStatusCard(protectionLevel = protectionLevel, securityScore = securityScore)
+            // ── Premium Hero: Shield Status ──
+            PremiumShieldStatusCard(
+                protectionLevel = protectionLevel,
+                securityScore = securityScore,
+                threatCount = threats.size
+            )
 
-        // ── Channel Shields Grid ──
-        SectionHeader(title = "Protection Modules")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            channelStatuses.take(2).forEach { status ->
-                ChannelShieldCard(
-                    status = status,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        when (status.channel) {
-                            Channel.SMS -> context.startActivity(Intent(context, SmsMainActivity::class.java))
-                            Channel.CALL -> context.startActivity(Intent(context, CallMainActivity::class.java))
-                            else -> {}
+            // ── Protection Modules Grid ──
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                SectionHeader(title = "CYBER DEFENSE MODULES")
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    channelStatuses.take(2).forEach { status ->
+                        PremiumChannelCard(
+                            status = status,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                when (status.channel) {
+                                    Channel.SMS -> context.startActivity(Intent(context, SmsMainActivity::class.java))
+                                    Channel.CALL -> context.startActivity(Intent(context, RakshakXActivity::class.java))
+                                    else -> {}
+                                }
+                            }
+                        )
+                    }
+                }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    channelStatuses.drop(2).forEach { status ->
+                        PremiumChannelCard(
+                            status = status,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                if (status.channel == Channel.WEB) onNavigateToSettings()
+                            }
+                        )
+                    }
+                }
+            }
+
+            // ── Quick Intelligence ──
+            SectionHeader(title = "THREAT INTELLIGENCE")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                listOf(
+                    Triple(Icons.Filled.Security, "Scan Link", onNavigateToSettings),
+                    Triple(Icons.Filled.History, "Timeline", onNavigateToCorrelation),
+                    Triple(Icons.Filled.Radar, "Live Feed", onNavigateToLiveThreat),
+                    Triple(Icons.Filled.Shield, "Verify", onNavigateToThreats)
+                ).forEach { (icon, label, action) ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.width(70.dp)
+                    ) {
+                        IconButton(
+                            onClick = action,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(GlassBg, MaterialTheme.shapes.medium)
+                        ) {
+                            Icon(icon, contentDescription = label, tint = colors.primary, modifier = Modifier.size(24.dp))
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(label, style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    }
+                }
+            }
+
+            // ── Web Scanner (Modernized) ──
+            PremiumWebScannerCard(activity = activity, colors = colors)
+
+            // ── Recent Threats ──
+            if (threats.isNotEmpty()) {
+                SectionHeader(
+                    title = "RECENT INTERCEPTIONS",
+                    action = {
+                        TextButton(onClick = onNavigateToThreats) {
+                            Text("DETAILS", color = colors.primary, style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            channelStatuses.drop(2).forEach { status ->
-                ChannelShieldCard(
-                    status = status,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        if (status.channel == Channel.WEB) onNavigateToSettings()
-                    }
-                )
-            }
-        }
-
-        // ── Quick Actions ──
-        SectionHeader(title = "Quick Actions")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            QuickActionButton(
-                icon = Icons.Filled.Sms,
-                label = "Analyze\nSMS",
-                color = Cyan400,
-                onClick = { context.startActivity(Intent(context, SmsMainActivity::class.java)) }
-            )
-            QuickActionButton(
-                icon = Icons.Filled.Timeline,
-                label = "Threat\nTimeline",
-                color = OrangeWarn,
-                onClick = onNavigateToCorrelation
-            )
-            QuickActionButton(
-                icon = Icons.Filled.History,
-                label = "View\nThreats",
-                color = RedCritical,
-                onClick = onNavigateToThreats
-            )
-            QuickActionButton(
-                icon = Icons.Filled.RadioButtonChecked,
-                label = "Live\nMonitor",
-                color = GreenSafe,
-                onClick = onNavigateToLiveThreat
-            )
-        }
-
-        // ── Web Scanners ──
-        SectionHeader(title = "Web Defense")
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium,
-            colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                var manualUrl by remember { mutableStateOf("") }
-                
-                OutlinedTextField(
-                    value = manualUrl,
-                    onValueChange = { manualUrl = it },
-                    label = { Text("Paste URL to scan") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.primary,
-                        unfocusedBorderColor = colors.border,
-                        focusedLabelColor = colors.primary,
-                        unfocusedLabelColor = colors.textSecondary
-                    )
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = {
-                            if (manualUrl.isNotBlank()) {
-                                val intent = Intent(activity, com.security.rakshakx.web.ui.UrlScanActivity::class.java).apply {
-                                    putExtra("EXTRA_URL", manualUrl)
-                                }
-                                activity.startActivity(intent)
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
-                    ) {
-                        Icon(Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Scan URL")
-                    }
-                    Button(
-                        onClick = {
-                            activity.startActivity(Intent(activity, com.security.rakshakx.web.ui.QrScannerActivity::class.java))
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
-                    ) {
-                        Icon(Icons.Filled.QrCodeScanner, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Scan QR")
-                    }
+                threats.take(3).forEach { entry ->
+                    ThreatCard(entry = entry)
                 }
+            } else {
+                PremiumEmptyState(colors = colors)
             }
-        }
 
-        // ── Recent Threats ──
-        if (threats.isNotEmpty()) {
-            SectionHeader(
-                title = "Recent Fraud Attempts",
-                action = {
-                    TextButton(onClick = onNavigateToThreats) {
-                        Text("View All", color = colors.primary, style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            )
-            threats.take(3).forEach { entry ->
-                ThreatCard(entry = entry)
-            }
-        } else {
-            // Show demo prompt
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(containerColor = colors.surfaceElevated)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.Security, contentDescription = null, tint = colors.primary, modifier = Modifier.size(32.dp))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("All Clear", style = MaterialTheme.typography.titleMedium, color = colors.safe)
-                    Text("No threats detected. All channels are actively monitoring.", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                }
-            }
+            Spacer(modifier = Modifier.height(100.dp))
         }
-
-        // ── Privacy Footer ──
-        SectionHeader(title = "Privacy Status")
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            PrivacyBadge(icon = Icons.Filled.Memory, text = "Local AI")
-            PrivacyBadge(icon = Icons.Filled.CloudOff, text = "No Cloud")
-            PrivacyBadge(icon = Icons.Filled.Lock, text = "Encrypted")
-        }
-
-        Spacer(modifier = Modifier.height(80.dp))  // Bottom nav clearance
     }
 }
+
+@Composable
+fun PremiumShieldStatusCard(
+    protectionLevel: ProtectionLevel,
+    securityScore: Int,
+    threatCount: Int
+) {
+    val colors = LocalRakshakXColors.current
+    val statusColor = when (protectionLevel) {
+        ProtectionLevel.PROTECTED -> colors.safe
+        ProtectionLevel.ELEVATED -> colors.warning
+        ProtectionLevel.THREAT_DETECTED -> colors.critical
+    }
+    
+    val statusText = when (protectionLevel) {
+        ProtectionLevel.PROTECTED -> "SYSTEMS SECURE"
+        ProtectionLevel.ELEVATED -> "ELEVATED RISK"
+        ProtectionLevel.THREAT_DETECTED -> "BREACH DETECTED"
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        colors = CardDefaults.cardColors(containerColor = Navy800),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Abstract background glow
+            Box(
+                modifier = Modifier
+                    .size(150.dp)
+                    .align(Alignment.CenterEnd)
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                            colors = listOf(statusColor.copy(alpha = 0.15f), Color.Transparent)
+                        )
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Large Score Ring
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(120.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = 1f,
+                        modifier = Modifier.fillMaxSize(),
+                        color = Color(0x1AFFFFFF),
+                        strokeWidth = 8.dp,
+                        trackColor = Color.Transparent
+                    )
+                    CircularProgressIndicator(
+                        progress = securityScore / 100f,
+                        modifier = Modifier.fillMaxSize(),
+                        color = statusColor,
+                        strokeWidth = 8.dp,
+                        trackColor = Color.Transparent,
+                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "$securityScore",
+                            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Black),
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "SCORE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(24.dp))
+
+                Column {
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = statusColor
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (threatCount == 0) "No active threats detected" else "$threatCount threats neutralized",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .background(statusColor.copy(alpha = 0.1f), MaterialTheme.shapes.extraSmall)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(statusColor, androidx.compose.foundation.shape.CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "LIVE MONITOR ACTIVE",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                            color = statusColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PremiumChannelCard(
+    status: ChannelStatus,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = LocalRakshakXColors.current
+    val icon = when (status.channel) {
+        Channel.SMS -> Icons.Filled.Sms
+        Channel.CALL -> Icons.Filled.Call
+        Channel.WEB -> Icons.Filled.Language
+        Channel.EMAIL -> Icons.Filled.Email
+    }
+    
+    val tint = if (status.isActive) colors.primary else colors.textMuted
+
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(110.dp),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = Navy800),
+        border = androidx.compose.foundation.BorderStroke(
+            width = 1.dp,
+            color = if (status.isActive) colors.primary.copy(alpha = 0.2f) else Color(0x1AFFFFFF)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+                if (status.threatCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .background(colors.critical.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "${status.threatCount}",
+                            color = colors.critical,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+            }
+            
+            Column {
+                Text(
+                    text = status.channel.name,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary
+                )
+                Text(
+                    text = if (status.isActive) "ACTIVE" else "INACTIVE",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                    color = if (status.isActive) colors.safe else colors.textMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PremiumWebScannerCard(activity: Activity, colors: RakshakXColors) {
+    var manualUrl by remember { mutableStateOf("") }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = Navy800),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1AFFFFFF))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "MANUAL INTERCEPTION",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = TextPrimary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            OutlinedTextField(
+                value = manualUrl,
+                onValueChange = { manualUrl = it },
+                placeholder = { Text("Paste suspicious URL here", color = colors.textMuted) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = MaterialTheme.shapes.medium,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colors.primary,
+                    unfocusedBorderColor = Color(0x1AFFFFFF),
+                    focusedContainerColor = Navy900,
+                    unfocusedContainerColor = Navy900,
+                )
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        if (manualUrl.isNotBlank()) {
+                            val intent = Intent(activity, com.security.rakshakx.web.ui.UrlScanActivity::class.java).apply {
+                                putExtra("EXTRA_URL", manualUrl)
+                            }
+                            activity.startActivity(intent)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.primary),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Text("SCAN URL", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, color = Color.Black))
+                }
+                IconButton(
+                    onClick = {
+                        activity.startActivity(Intent(activity, com.security.rakshakx.web.ui.QrScannerActivity::class.java))
+                    },
+                    modifier = Modifier
+                        .background(GlassBg, MaterialTheme.shapes.medium)
+                        .size(48.dp)
+                ) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = colors.primary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PremiumEmptyState(colors: RakshakXColors) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = colors.safe.copy(alpha = 0.2f),
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            "NO THREATS DETECTED",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = colors.safe
+        )
+        Text(
+            "Your digital space is clean.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary
+        )
+    }
+}
+
