@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.RakshakX" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Base theme uses dark navy background, no action bar (Compose handles everything) -->
+    <style name="Theme.RakshakX" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/navy_900</item>
+        <item name="android:statusBarColor">@color/navy_900</item>
+        <item name="android:navigationBarColor">@color/navy_800</item>
+    </style>
 </resources>

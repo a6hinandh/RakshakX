@@ -124,14 +124,10 @@ class CallAudioRecorder(private val context: Context? = null) {
     }
 
     private fun getAudioDir(): File {
-        return if (context != null) {
-            File(context.getExternalFilesDir(null), AUDIO_DIR).apply {
-                if (!exists()) mkdirs()
-            }
-        } else {
-            File(context.filesDir, "call_audio").apply {
-                if (!exists()) mkdirs()
-            }
+        val ctx = context ?: throw IllegalStateException("Context is required for CallAudioRecorder")
+        val baseDir = ctx.getExternalFilesDir(null) ?: ctx.filesDir
+        return File(baseDir, AUDIO_DIR).apply {
+            if (!exists()) mkdirs()
         }
     }
 

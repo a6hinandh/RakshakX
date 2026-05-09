@@ -3,8 +3,7 @@ package com.security.rakshakx.call.core.storage
 import android.content.Context
 import androidx.room.Room
 import com.security.rakshakx.call.core.security.EncryptionManager
-import net.sqlcipher.database.SQLiteDatabase
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 object DatabaseFactory {
     @Volatile
@@ -17,8 +16,8 @@ object DatabaseFactory {
     }
 
     fun createEncrypted(context: Context): RakshakDatabase {
-        SQLiteDatabase.loadLibs(context)
-        val factory = SupportFactory(EncryptionManager.getOrCreateDbPassphrase())
+        System.loadLibrary("sqlcipher")
+        val factory = SupportOpenHelperFactory(EncryptionManager.getOrCreateDbPassphrase())
         return Room.databaseBuilder(context, RakshakDatabase::class.java, "rakshakx-secure.db")
             .openHelperFactory(factory)
             .fallbackToDestructiveMigration()

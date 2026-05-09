@@ -2,11 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- ════════════════════════════════════════════════════════════
+         CORE PERMISSIONS
+         ════════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -17,8 +20,8 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
+    <!-- Optional browser package visibility -->
     <queries>
         <package android:name="com.android.chrome" />
         <package android:name="com.microsoft.emmx" />
@@ -27,26 +30,38 @@
 
     <application
         android:name=".RakshakXApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.RakshakX">
+        android:theme="@style/Theme.RakshakX"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="34">
+
+        <!-- ════════════════════════════════════════════════════════════
+             ACTIVITIES
+             ════════════════════════════════════════════════════════════ -->
+
         <activity
-            android:name=".MainActivity"
+            android:name=".onboarding.OnboardingActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.RakshakX">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX" />
+
+        <!-- Call channel -->
         <activity
             android:name=".call.CallMainActivity"
             android:exported="false"
@@ -77,64 +92,58 @@
             android:exported="false"
             android:theme="@style/Theme.RakshakX.SafeCall" />
 
+        <!-- SMS -->
+        <activity
+            android:name=".sms.SmsMainActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX" />
+
+        <!-- ════════════════════════════════════════════════════════════
+             SERVICES
+             ════════════════════════════════════════════════════════════ -->
+
+        <!-- Foreground fraud monitoring -->
         <service
             android:name=".call.services.foreground.FraudMonitoringForegroundService"
             android:exported="false" />
 
+        <!-- Call recording -->
         <service
             android:name=".call.callanalysis.CallRecordingService"
             android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone"
+            tools:replace="android:foregroundServiceType" />
 
+        <!-- Overlay -->
         <service
             android:name=".call.callanalysis.OverlayBubbleService"
             android:exported="false" />
 
+        <!-- Hackathon mode -->
         <service
             android:name=".call.callanalysis.HackathonModeCallMonitorService"
             android:exported="false" />
 
+        <!-- Unified notification listener -->
         <service
-            android:name=".call.services.receivers.SmsNotificationListenerService"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
+            android:name=".sms.NotificationService"
+            android:exported="true"
+            android:label="RakshakX Fraud Guard"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+            <meta-data
+                android:name="android.service.notification.default_filter_types"
+                android:value="conversations" />
         </service>
 
-        <receiver
-            android:name=".call.services.receivers.BootCompletedReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".call.services.receivers.SmsEventReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".call.callanalysis.CallStateReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.PHONE_STATE" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
-            android:name=".call.callanalysis.NotificationActionReceiver"
-            android:exported="false" />
-
+        <!-- Accessibility -->
         <service
             android:name=".web.services.AccessibilityMonitorService"
             android:exported="false"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
@@ -144,31 +153,64 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
+        <!-- VPN -->
         <service
             android:name=".web.services.FraudVpnService"
             android:exported="false"
-            android:foregroundServiceType="specialUse|dataSync"
-            android:permission="android.permission.BIND_VPN_SERVICE">
+            android:foregroundServiceType="dataSync"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            tools:replace="android:foregroundServiceType,android:exported">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="VPN traffic interception for real-time fraud and phishing protection" />
         </service>
 
-        <service
-            android:name=".email.listener.EmailNotificationListener"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        <!-- ════════════════════════════════════════════════════════════
+             RECEIVERS
+             ════════════════════════════════════════════════════════════ -->
+
+        <!-- Boot -->
+        <receiver
+            android:name=".sms.BootReceiver"
             android:exported="true">
-
             <intent-filter>
-                <action android:name=
-                    "android.service.notification.NotificationListenerService" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
+        </receiver>
 
-        </service>
+        <!-- SMS event receiver -->
+        <receiver
+            android:name=".call.services.receivers.SmsEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
 
+        <!-- SMS fallback receiver -->
+        <receiver
+            android:name=".sms.SmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="2147483647">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Call state -->
+        <receiver
+            android:name=".call.callanalysis.CallStateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification action -->
+        <receiver
+            android:name=".call.callanalysis.NotificationActionReceiver"
+            android:exported="false" />
 
     </application>
 

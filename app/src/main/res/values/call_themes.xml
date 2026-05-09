@@ -2,14 +2,14 @@
 <resources>
 
     <!-- Transparent theme for overlay (already referenced in manifest) -->
-    <style name="Theme.Transparent" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Transparent" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:colorBackgroundCacheHint">@null</item>
     </style>
 
-    <style name="Theme.RakshakX.Call" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.RakshakX.Call" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowNoTitle">true</item>
     </style>
 
@@ -21,7 +21,7 @@
     </style>
 
     <!-- Fullscreen red alert theme for FraudAlertActivity -->
-    <style name="Theme.RakshakX.FraudAlert" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.RakshakX.FraudAlert" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -29,7 +29,7 @@
     </style>
 
     <!-- Fullscreen green safe theme for SafeCallActivity -->
-    <style name="Theme.RakshakX.SafeCall" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.RakshakX.SafeCall" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:statusBarColor">@android:color/transparent</item>

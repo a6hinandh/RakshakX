@@ -105,6 +105,19 @@ dependencies {
 
     implementation(libs.androidx.security.crypto)
 
+    // Navigation
+    implementation(libs.androidx.navigation.compose)
+
+    // Extended Material Icons
+    implementation(libs.androidx.compose.material.icons.extended)
+
+    // Animation
+    implementation(libs.androidx.compose.animation)
+
+    // Views (Legacy)
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("com.google.android.material:material:1.11.0")
+
     // On-device AI
     implementation(libs.tensorflow.lite)
     implementation(libs.onnxruntime.android)
