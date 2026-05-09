@@ -74,6 +74,7 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
+        Log.d("RAKSHAK_LISTENER", "CONNECTED SUCCESSFULLY")
         super.onListenerConnected()
         Log.d(TAG, "onListenerConnected")
     }
@@ -99,6 +100,7 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        Log.d("RAKSHAK_LISTENER", "NOTIFICATION RECEIVED")
         val pkg = sbn.packageName ?: return
         if (pkg == OWN_PACKAGE) return
 
@@ -107,6 +109,9 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val body = bigText.ifBlank { text }
+        Log.d(TAG, "PACKAGE = $pkg")
+        Log.d(TAG, "TITLE = $title")
+        Log.d(TAG, "BODY = $body")
 
         if (body.isBlank()) return
 
