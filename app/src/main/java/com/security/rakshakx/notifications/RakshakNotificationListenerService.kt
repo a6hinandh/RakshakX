@@ -100,28 +100,85 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+
+        Log.d("RAKSHAK_LISTENER", "════════════════════")
         Log.d("RAKSHAK_LISTENER", "NOTIFICATION RECEIVED")
+
         val pkg = sbn.packageName ?: return
+
+        Log.d("RAKSHAK_LISTENER", "PACKAGE = $pkg")
+
         if (pkg == OWN_PACKAGE) return
 
         val extras = sbn.notification.extras ?: return
-        val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
+
+        val title =
+            extras.getString(Notification.EXTRA_TITLE)
+                ?: "NO TITLE"
+
+        val text =
+            extras.getCharSequence(Notification.EXTRA_TEXT)
+                ?.toString()
+                ?: "NO TEXT"
+
+        val bigText =
+            extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+                ?.toString()
+                ?: "NO BIG TEXT"
+
+        Log.d("RAKSHAK_LISTENER", "TITLE = $title")
+        Log.d("RAKSHAK_LISTENER", "TEXT = $text")
+        Log.d("RAKSHAK_LISTENER", "BIG TEXT = $bigText")
+
         val body = bigText.ifBlank { text }
-        Log.d(TAG, "PACKAGE = $pkg")
-        Log.d(TAG, "TITLE = $title")
-        Log.d(TAG, "BODY = $body")
 
         if (body.isBlank()) return
 
         when {
-            isSmsAppPackage(pkg) -> runCatching { handleSmsNotification(pkg, title, body) }
-                .onFailure { Log.e(TAG, "SMS pipeline failed", it) }
-            isEmailAppPackage(pkg) -> runCatching { handleEmailNotification(pkg, title, body) }
-                .onFailure { Log.e(TAG, "Email pipeline failed", it) }
+
+            isSmsAppPackage(pkg) -> {
+
+                runCatching {
+
+                    handleSmsNotification(
+                        pkg,
+                        title,
+                        body
+                    )
+
+                }.onFailure {
+
+                    Log.e(
+                        TAG,
+                        "SMS pipeline failed",
+                        it
+                    )
+                }
+            }
+
+            isEmailAppPackage(pkg) -> {
+
+                runCatching {
+
+                    handleEmailNotification(
+                        pkg,
+                        title,
+                        body
+                    )
+
+                }.onFailure {
+
+                    Log.e(
+                        TAG,
+                        "Email pipeline failed",
+                        it
+                    )
+                }
+            }
         }
     }
+
+
 
     private fun handleSmsNotification(pkg: String, title: String, body: String) {
         Log.d(TAG, "Processing SMS from: $pkg")
