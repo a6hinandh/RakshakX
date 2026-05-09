@@ -1,8 +1,6 @@
-package com.security.rakshakx.call.callanalysis
+package com.security.rakshakx.notifications
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -15,41 +13,21 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.security.rakshakx.R
-import com.security.rakshakx.call.callanalysis.ui.RakshakXActivity
+import com.security.rakshakx.call.callanalysis.FraudDecision
+import com.security.rakshakx.call.callanalysis.RiskConfig
 import com.security.rakshakx.call.callanalysis.data.CallRecord
-object RakshakXNotificationManager {
+import com.security.rakshakx.call.callanalysis.ui.RakshakXActivity
+import com.security.rakshakx.notifications.receivers.NotificationActionReceiver
 
-    private const val TAG = "RakshakXNotificationMgr"
-    private const val CHANNEL_ID_ALERTS = "rakshakx_alerts"
-    private const val CHANNEL_ID_RECORDING = "rakshakx_recording"
+/**
+ * Call-channel fraud notifications (risk UI + recording hybrid result).
+ * Merged from former RakshakXNotificationManager + FraudNotificationHelper.
+ */
+object CallFraudNotifications {
+
+    private const val TAG = "CallFraudNotifications"
     private const val RECORDING_NOTIFICATION_ID = 9999
-
-    fun createNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager =
-                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            val alertChannel = NotificationChannel(
-                CHANNEL_ID_ALERTS,
-                "RakshakX Fraud Alerts",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Notifications for detected fraud calls"
-                enableLights(true)
-                setShowBadge(true)
-            }
-            notificationManager.createNotificationChannel(alertChannel)
-
-            val recordingChannel = NotificationChannel(
-                CHANNEL_ID_RECORDING,
-                "RakshakX Recording",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Notification while analyzing calls"
-            }
-            notificationManager.createNotificationChannel(recordingChannel)
-        }
-    }
+    private const val FRAUD_RESULT_NOTIFICATION_ID = 2005
 
     private fun hasPostNotificationPermission(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -68,7 +46,7 @@ object RakshakXNotificationManager {
         decision: FraudDecision
     ) {
         try {
-            createNotificationChannels(context)
+            RakshakNotificationChannels.bootstrap(context)
 
             if (callRecord.riskScore < RiskConfig.THRESHOLD_SAFE_ROUTING) {
                 Log.d(TAG, "Risk score too low (${callRecord.riskScore}), skipping notification")
@@ -113,6 +91,7 @@ object RakshakXNotificationManager {
 
             val safeIntent = Intent(context, NotificationActionReceiver::class.java).apply {
                 action = "ACTION_MARK_SAFE"
+                putExtra("phoneNumber", callRecord.phoneNumber)
                 putExtra("callId", callRecord.id)
             }
             val safePendingIntent = PendingIntent.getBroadcast(
@@ -124,7 +103,7 @@ object RakshakXNotificationManager {
 
             val colorInt = ContextCompat.getColor(context, colorResId)
 
-            val builder = NotificationCompat.Builder(context, CHANNEL_ID_ALERTS)
+            val builder = NotificationCompat.Builder(context, RakshakNotificationChannels.ALERTS)
                 .setSmallIcon(R.drawable.ic_shield_warning)
                 .setContentTitle("⚠️ RakshakX Alert: $riskLevel")
                 .setContentText("${callRecord.phoneNumber} | ${decision.reason}")
@@ -181,14 +160,14 @@ object RakshakXNotificationManager {
 
     fun showRecordingNotification(context: Context, phoneNumber: String) {
         try {
-            createNotificationChannels(context)
+            RakshakNotificationChannels.bootstrap(context)
 
             if (!hasPostNotificationPermission(context)) {
                 Log.w(TAG, "POST_NOTIFICATIONS permission not granted, skipping recording notification")
                 return
             }
 
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID_RECORDING)
+            val notification = NotificationCompat.Builder(context, RakshakNotificationChannels.RECORDING)
                 .setSmallIcon(R.drawable.ic_recording)
                 .setContentTitle("RakshakX is analyzing this call...")
                 .setContentText("Phone: $phoneNumber")
@@ -218,5 +197,59 @@ object RakshakXNotificationManager {
             Log.e(TAG, "SecurityException while dismissing recording notification", se)
         }
     }
-}
 
+    /** Hybrid recording fraud result (formerly FraudNotificationHelper). */
+    fun showFraudResultNotification(
+        context: Context,
+        hybridScore: Float,
+        transcript: String?,
+        riskLevel: String
+    ) {
+        RakshakNotificationChannels.bootstrap(context)
+
+        val pct = (hybridScore * 100).toInt()
+
+        val title: String
+        val message: String
+        val iconRes: Int
+
+        when {
+            hybridScore >= RiskConfig.THRESHOLD_HIGH -> {
+                title = "⚠️ Possible scam detected ($pct%)"
+                message = "This call looks risky. Risk level: $riskLevel."
+                iconRes = R.drawable.ic_shield_warning
+            }
+            hybridScore >= RiskConfig.THRESHOLD_MEDIUM -> {
+                title = "🤔 Call may be suspicious ($pct%)"
+                message = "Some risk indicators were found. Risk level: $riskLevel."
+                iconRes = R.drawable.ic_shield_warning
+            }
+            else -> {
+                title = "✅ Call looks safe ($pct%)"
+                message = "Low fraud risk detected. Risk level: $riskLevel."
+                iconRes = R.drawable.ic_check
+            }
+        }
+
+        val snippet = transcript
+            ?.take(120)
+            ?.ifBlank { "Transcript not available or too short." }
+            ?: "Transcript not available."
+
+        val fullText = "$message\n\nTranscript snippet:\n$snippet"
+
+        val builder = NotificationCompat.Builder(context, RakshakNotificationChannels.FRAUD_RESULTS)
+            .setSmallIcon(iconRes)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(fullText))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        try {
+            NotificationManagerCompat.from(context).notify(FRAUD_RESULT_NOTIFICATION_ID, builder.build())
+        } catch (e: SecurityException) {
+            // POST_NOTIFICATIONS not granted
+        }
+    }
+}

@@ -4,9 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.security.rakshakx.call.services.foreground.FraudMonitoringForegroundService
-import com.security.rakshakx.call.services.foreground.MonitoringPreferences
-import com.security.rakshakx.call.services.foreground.RiskScanScheduler
+import com.security.rakshakx.startup.AppStartupCoordinator
 
 /**
  * BootReceiver — UNIFIED boot receiver for all channels.
@@ -28,13 +26,7 @@ class BootReceiver : BroadcastReceiver() {
 
         Log.d("RakshakX_BOOT", "Device booted — restarting all channel services")
 
-        // ── SMS channel: reschedule inbox polling ──
-        SmsPollingWorker.schedule(context)
-
-        // ── Call channel: restart monitoring if it was enabled ──
-        if (MonitoringPreferences.isEnabled(context)) {
-            FraudMonitoringForegroundService.start(context.applicationContext)
-            RiskScanScheduler.schedulePeriodic(context.applicationContext)
-        }
+        // Reconcile startup contracts with current permission state.
+        AppStartupCoordinator.reconcileOnBoot(context.applicationContext)
     }
 }

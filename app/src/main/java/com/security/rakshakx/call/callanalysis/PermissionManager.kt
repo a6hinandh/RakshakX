@@ -4,26 +4,28 @@ import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import com.security.rakshakx.permissions.PermissionManager as AppPermissionManager
 
 /**
  * PermissionManager
  *
- * Centralized permission handling with fallback modes.
- * Detects missing permissions and guides user to grant them.
+ * Deprecated adapter kept for legacy call-analysis UI flow.
+ * Canonical readiness now lives in com.security.rakshakx.permissions.PermissionManager.
  */
+@Deprecated(
+    message = "Use com.security.rakshakx.permissions.PermissionManager for canonical checks."
+)
 class PermissionManager(private val context: Context) {
 
     companion object {
         const val REQUEST_CODE_PERMISSIONS = 1001
         const val REQUEST_CODE_OVERLAY = 1002
 
-        private val REQUIRED_PERMISSIONS = arrayOf(
+        private val LEGACY_REQUIRED_PERMISSIONS = arrayOf(
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.POST_NOTIFICATIONS
@@ -34,8 +36,8 @@ class PermissionManager(private val context: Context) {
      * Check if all required permissions are granted.
      */
     fun hasAllPermissions(): Boolean {
-        return REQUIRED_PERMISSIONS.all { permission ->
-            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        return LEGACY_REQUIRED_PERMISSIONS.all { permission ->
+            AppPermissionManager.hasPermission(context, permission)
         }
     }
 
@@ -56,7 +58,7 @@ class PermissionManager(private val context: Context) {
     fun requestPermissions(activity: Activity) {
         ActivityCompat.requestPermissions(
             activity,
-            REQUIRED_PERMISSIONS,
+            LEGACY_REQUIRED_PERMISSIONS,
             REQUEST_CODE_PERMISSIONS
         )
     }
@@ -80,8 +82,8 @@ class PermissionManager(private val context: Context) {
     fun getMissingPermissions(): List<String> {
         val missing = mutableListOf<String>()
 
-        REQUIRED_PERMISSIONS.forEach { permission ->
-            if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+        LEGACY_REQUIRED_PERMISSIONS.forEach { permission ->
+            if (!AppPermissionManager.hasPermission(context, permission)) {
                 missing.add(getPermissionName(permission))
             }
         }
@@ -109,15 +111,9 @@ class PermissionManager(private val context: Context) {
      * Determine available operation mode based on permissions.
      */
     fun getOperationMode(): OperationMode {
-        val hasPhoneState = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_PHONE_STATE
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasPhoneState = AppPermissionManager.hasPermission(context, Manifest.permission.READ_PHONE_STATE)
 
-        val hasRecordAudio = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasRecordAudio = AppPermissionManager.hasPermission(context, Manifest.permission.RECORD_AUDIO)
 
         val hasOverlay = hasOverlayPermission()
 

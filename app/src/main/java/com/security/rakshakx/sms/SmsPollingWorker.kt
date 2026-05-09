@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
 import androidx.work.*
+import com.security.rakshakx.notifications.SmsFraudNotifications
 import java.util.concurrent.TimeUnit
 
 /**
@@ -132,6 +133,10 @@ class SmsPollingWorker(
                 val body      = cursor.getString(bodyCol)    ?: ""
                 val timestamp = cursor.getLong(dateCol)
 
+                if (!SmsDeduplicationGuard.shouldProcess(context, sender, body)) {
+                    continue
+                }
+
                 // Track the newest timestamp we've seen
                 if (timestamp > newestTimestamp) {
                     newestTimestamp = timestamp
@@ -143,7 +148,7 @@ class SmsPollingWorker(
                 Log.d(TAG, "Risk score: $risk for SMS from $sender")
 
                 if (risk >= RiskEngine.ALERT_THRESHOLD) {
-                    NotificationHelper.showFraudAlert(
+                    SmsFraudNotifications.showFraudAlert(
                         context   = context,
                         sender    = sender,
                         message   = body,           // FULL body — not truncated

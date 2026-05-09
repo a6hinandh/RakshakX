@@ -1,14 +1,12 @@
-package com.security.rakshakx.sms
+package com.security.rakshakx.notifications
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.security.rakshakx.permissions.PermissionManager
+import com.security.rakshakx.sms.RiskEngine
 
-object NotificationHelper {
-
-    private const val CHANNEL_ID = "rakshak_alerts"
+object SmsFraudNotifications {
 
     fun showFraudAlert(
         context: Context,
@@ -17,19 +15,22 @@ object NotificationHelper {
         riskScore: Int,
         source: String
     ) {
+        if (!PermissionManager.hasNotificationPermission(context)) {
+            return
+        }
+        RakshakNotificationChannels.bootstrap(context.applicationContext)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        ensureChannel(manager)
 
         val severity = RiskEngine.severity(riskScore)
         val title = when (severity) {
             "CRITICAL" -> "🚨 CRITICAL Fraud Alert"
-            else       -> "⚠️ Suspicious SMS Detected"
+            else -> "⚠️ Suspicious SMS Detected"
         }
 
         val body = "Risk: $riskScore/100 [$severity]\nFrom: $sender\n\n" +
-                message.take(300).let { if (message.length > 300) "$it…" else it }
+            message.take(300).let { if (message.length > 300) "$it…" else it }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, RakshakNotificationChannels.ALERTS)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle(title)
             .setContentText("From $sender — Risk: $riskScore/100")
@@ -41,17 +42,5 @@ object NotificationHelper {
             .build()
 
         manager.notify(System.currentTimeMillis().toInt(), notification)
-    }
-
-    private fun ensureChannel(manager: NotificationManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            manager.getNotificationChannel(CHANNEL_ID) == null) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Rakshak Fraud Alerts",
-                    NotificationManager.IMPORTANCE_HIGH).apply {
-                    enableVibration(true)
-                }
-            )
-        }
     }
 }

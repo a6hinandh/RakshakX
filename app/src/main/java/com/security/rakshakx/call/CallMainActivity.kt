@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import com.security.rakshakx.call.services.foreground.FraudMonitoringForegroundService
 import com.security.rakshakx.call.services.foreground.MonitoringPreferences
 import com.security.rakshakx.call.services.foreground.RiskScanScheduler
+import com.security.rakshakx.call.callanalysis.HackathonModeCallMonitorService
 import com.security.rakshakx.call.ui.RakshakXApp
 import com.security.rakshakx.call.callanalysis.ui.RakshakXActivity
 import com.security.rakshakx.call.callanalysis.data.CallDatabase
@@ -88,7 +89,7 @@ class CallMainActivity : ComponentActivity() {
                 onToggleBackgroundMonitoring = ::onToggleBackgroundMonitoring,
                 onOpenCallAnalysis = ::openCallAnalysis,
                 onDebugShowLastCall = ::logLastCallRecord,
-                onStartHackathonMode = { /* Pass empty lambda to fix Error :89 */ }
+                onStartHackathonMode = ::startHackathonMode
             )
         }
     }
@@ -107,11 +108,10 @@ class CallMainActivity : ComponentActivity() {
     }
 
     private fun requestOverlayPermission() {
-        // Warning :109 fixed (removed unnecessary M check as min SDK is likely >= 26)
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                "package:$packageName".toUri() // Warning :113 fixed using .toUri()
+                "package:$packageName".toUri()
             )
             overlayPermissionLauncher.launch(intent)
         }
@@ -119,7 +119,7 @@ class CallMainActivity : ComponentActivity() {
 
     private fun requestDefaultSmsRole() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-        val roleManager = getSystemService(RoleManager::class.java) // Warning :122 fixed
+        val roleManager = getSystemService(RoleManager::class.java)
         if (!roleManager.isRoleAvailable(RoleManager.ROLE_SMS)) return
         if (roleManager.isRoleHeld(RoleManager.ROLE_SMS)) return
         val roleIntent: Intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_SMS)
@@ -136,8 +136,6 @@ class CallMainActivity : ComponentActivity() {
         callLogPermissionGranted = hasPermission(Manifest.permission.READ_CALL_LOG)
         phonePermissionGranted = hasPermission(Manifest.permission.READ_PHONE_STATE)
         microphonePermissionGranted = hasPermission(Manifest.permission.RECORD_AUDIO)
-
-        // Warning :140 fixed
         overlayPermissionGranted = Settings.canDrawOverlays(this)
 
         isDefaultSmsApp = isDefaultSmsRoleHeld()
@@ -161,7 +159,7 @@ class CallMainActivity : ComponentActivity() {
 
     private fun isDefaultSmsRoleHeld(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
-        val roleManager = getSystemService(RoleManager::class.java) // Warning :167 fixed
+        val roleManager = getSystemService(RoleManager::class.java)
         return roleManager.isRoleAvailable(RoleManager.ROLE_SMS) &&
                 roleManager.isRoleHeld(RoleManager.ROLE_SMS)
     }
@@ -227,5 +225,13 @@ class CallMainActivity : ComponentActivity() {
             )
         }
     }
-} // Error :236 fixed by properly closing the class
+
+    private fun startHackathonMode() {
+        if (!phonePermissionGranted || !microphonePermissionGranted) {
+            requestRequiredPermissions()
+            return
+        }
+        HackathonModeCallMonitorService.startMonitoring(applicationContext)
+    }
+}
 

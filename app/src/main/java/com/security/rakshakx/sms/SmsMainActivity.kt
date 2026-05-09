@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.security.rakshakx.notifications.RakshakNotificationListenerService
 
 class SmsMainActivity : ComponentActivity() {
 
@@ -176,7 +177,7 @@ class SmsMainActivity : ComponentActivity() {
         val flat = Settings.Secure.getString(
             contentResolver, "enabled_notification_listeners"
         ) ?: return false
-        val own = ComponentName(this, NotificationService::class.java)
+        val own = ComponentName(this, RakshakNotificationListenerService::class.java)
         return flat.split(":").any { entry ->
             try { ComponentName.unflattenFromString(entry) == own }
             catch (_: Exception) { false }

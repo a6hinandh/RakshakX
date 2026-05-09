@@ -1,27 +1,23 @@
-package com.security.rakshakx.web.notifications
+package com.security.rakshakx.notifications.vpn
 
 import android.app.Notification
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import com.security.rakshakx.R
+import com.security.rakshakx.notifications.RakshakNotificationChannels
+import com.security.rakshakx.permissions.PermissionManager
 
 class VpnProtectionNotifier(private val context: Context) {
-    private val channelId = "rakshakx_vpn"
+
     private val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     fun createChannel() {
-        val channel = NotificationChannel(
-            channelId,
-            "RakshakX Protection",
-            NotificationManager.IMPORTANCE_LOW
-        )
-        manager.createNotificationChannel(channel)
+        RakshakNotificationChannels.bootstrap(context.applicationContext)
     }
 
     fun buildForegroundNotification(): Notification {
-        return NotificationCompat.Builder(context, channelId)
+        return NotificationCompat.Builder(context, RakshakNotificationChannels.VPN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("RakshakX Protection")
             .setContentText("Monitoring browser traffic locally")
@@ -30,7 +26,7 @@ class VpnProtectionNotifier(private val context: Context) {
     }
 
     fun buildThreatAlert(message: String): Notification {
-        return NotificationCompat.Builder(context, channelId)
+        return NotificationCompat.Builder(context, RakshakNotificationChannels.VPN)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Threat blocked")
             .setContentText(message)
@@ -39,6 +35,9 @@ class VpnProtectionNotifier(private val context: Context) {
     }
 
     fun notifyThreat(message: String) {
+        if (!PermissionManager.hasNotificationPermission(context)) {
+            return
+        }
         manager.notify(THREAT_NOTIFICATION_ID, buildThreatAlert(message))
     }
 

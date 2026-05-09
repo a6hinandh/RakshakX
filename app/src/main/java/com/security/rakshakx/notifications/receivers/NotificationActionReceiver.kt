@@ -1,4 +1,4 @@
-package com.security.rakshakx.call.callanalysis
+package com.security.rakshakx.notifications.receivers
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
  * Handles user actions from risk notifications:
  * - Block Number
  * - Mark Safe
- * - View Details
  */
 class NotificationActionReceiver : BroadcastReceiver() {
 
@@ -27,23 +26,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
         if (context == null || intent == null) return
 
         val action = intent.action ?: return
-        val phoneNumber = intent.getStringExtra("phoneNumber") ?: return
         val callId = intent.getLongExtra("callId", -1L)
 
-        Log.d(TAG, "Action received: $action for $phoneNumber")
-
-        CoroutineScope(Dispatchers.IO).launch {
-            when (action) {
-                "ACTION_BLOCK_NUMBER" -> {
+        when (action) {
+            "ACTION_BLOCK_NUMBER" -> {
+                val phoneNumber = intent.getStringExtra("phoneNumber") ?: return
+                CoroutineScope(Dispatchers.IO).launch {
                     handleBlockNumber(context, phoneNumber, callId)
                 }
-                "ACTION_MARK_SAFE" -> {
+            }
+            "ACTION_MARK_SAFE" -> {
+                CoroutineScope(Dispatchers.IO).launch {
                     handleMarkSafe(context, callId)
                 }
             }
+            else -> return
         }
 
-        // Dismiss notification
         if (callId != -1L) {
             NotificationManagerCompat.from(context).cancel(callId.toInt())
         }
@@ -51,7 +50,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     private suspend fun handleBlockNumber(context: Context, phoneNumber: String, callId: Long) {
         try {
-            // Add to blocked numbers repository
             val blockedRepository = BlockedNumbersRepository(context)
             blockedRepository.addBlockedNumber(phoneNumber)
             Log.d(TAG, "Number blocked: $phoneNumber")
@@ -62,7 +60,6 @@ class NotificationActionReceiver : BroadcastReceiver() {
 
     private suspend fun handleMarkSafe(context: Context, callId: Long) {
         try {
-            // Update call record to ALLOW
             val repository = CallAnalysisRepository(context)
             val record = repository.getCallRecordById(callId)
             if (record != null) {
@@ -78,6 +75,3 @@ class NotificationActionReceiver : BroadcastReceiver() {
         }
     }
 }
-
-
-

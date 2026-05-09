@@ -1,7 +1,9 @@
 package com.security.rakshakx.ui.screens
 
+import android.Manifest
 import android.app.Activity
 import android.net.VpnService
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,15 +23,38 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import com.security.rakshakx.email.pipeline.EmailThreatPipeline
+import com.security.rakshakx.permissions.PermissionManager
 import com.security.rakshakx.ui.components.SectionHeader
 import com.security.rakshakx.ui.theme.*
 import com.security.rakshakx.web.services.FraudVpnService
 import com.security.rakshakx.web.utils.VpnStatusStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 @Composable
 fun SettingsScreen(activity: Activity) {
     val colors = LocalRakshakXColors.current
+
+    val emailTestIoScope = remember {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+    DisposableEffect(Unit) {
+        onDispose { emailTestIoScope.cancel() }
+    }
+
+    var showEmailTestDialog by remember { mutableStateOf(false) }
+    var emailTestTitle by remember { mutableStateOf(EmailThreatPipeline.presetPhishingSampleTitle()) }
+    var emailTestBody by remember { mutableStateOf(EmailThreatPipeline.presetPhishingSampleBody()) }
+    var lastScanSummary by remember { mutableStateOf<String?>(null) }
+
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* result handled on next pipeline run */ }
 
     // Settings state
     var sensitivity by remember { mutableStateOf(0.5f) }
@@ -150,6 +176,136 @@ fun SettingsScreen(activity: Activity) {
             onCheckedChange = { emailEnabled = it },
             iconColor = RedCritical
         )
+        OutlinedButton(
+            onClick = {
+                lastScanSummary = null
+                showEmailTestDialog = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)
+        ) {
+            Icon(Icons.Filled.Science, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Test email phishing scan")
+        }
+
+        if (showEmailTestDialog) {
+            AlertDialog(
+                onDismissRequest = { showEmailTestDialog = false },
+                title = { Text("Test email phishing scan", color = colors.textPrimary) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .heightIn(max = 420.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "Uses the same analysis as Gmail (and other mail) notifications. If the outcome is HIGH RISK, RakshakX posts a fraud alert notification.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textMuted
+                        )
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            !PermissionManager.hasNotificationPermission(activity)
+                        ) {
+                            Text(
+                                "Notification permission is off — grant it to see HIGH RISK alerts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.warning
+                            )
+                        }
+                        OutlinedTextField(
+                            value = emailTestTitle,
+                            onValueChange = { emailTestTitle = it },
+                            label = { Text("Subject") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences
+                            )
+                        )
+                        OutlinedTextField(
+                            value = emailTestBody,
+                            onValueChange = { emailTestBody = it },
+                            label = { Text("Message body") },
+                            minLines = 5,
+                            maxLines = 12,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
+                            ),
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Sentences
+                            )
+                        )
+                        TextButton(
+                            onClick = {
+                                emailTestTitle = EmailThreatPipeline.presetPhishingSampleTitle()
+                                emailTestBody = EmailThreatPipeline.presetPhishingSampleBody()
+                            },
+                            modifier = Modifier.align(Alignment.Start)
+                        ) {
+                            Text("Load sample phishing text", color = colors.primary)
+                        }
+                        lastScanSummary?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEmailTestDialog = false }) {
+                        Text("Close", color = colors.textMuted)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                !PermissionManager.hasNotificationPermission(activity)
+                            ) {
+                                notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            val ctx = activity.applicationContext
+                            val result = EmailThreatPipeline.process(
+                                context = ctx,
+                                title = emailTestTitle.trim().ifBlank { "(no subject)" },
+                                body = emailTestBody,
+                                persistenceScope = emailTestIoScope
+                            )
+                            val extras = buildString {
+                                append("${result.riskLevel} • score ${result.score}")
+                                if (result.reasons.isNotEmpty()) {
+                                    append("\n")
+                                    append(result.reasons.joinToString(" · "))
+                                }
+                                if (result.riskLevel == "HIGH RISK" &&
+                                    PermissionManager.hasNotificationPermission(activity)
+                                ) {
+                                    append("\nA HIGH RISK notification was sent.")
+                                } else if (result.riskLevel == "HIGH RISK") {
+                                    append("\nTurn on notifications to see the alert.")
+                                }
+                            }
+                            lastScanSummary = extras
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
+                    ) {
+                        Text("Run scan")
+                    }
+                },
+                containerColor = colors.cardBackground,
+                tonalElevation = 4.dp
+            )
+        }
 
         // ── Auto-delete ──
         SectionHeader(title = "Data Retention")

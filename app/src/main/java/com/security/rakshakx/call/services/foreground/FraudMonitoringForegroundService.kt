@@ -1,6 +1,5 @@
 package com.security.rakshakx.call.services.foreground
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Notification
 import android.app.PendingIntent
@@ -18,6 +17,7 @@ import com.security.rakshakx.call.core.storage.DatabaseFactory
 import com.security.rakshakx.call.core.storage.RiskScoreRepository
 import com.security.rakshakx.call.CallMainActivity
 import com.security.rakshakx.R
+import com.security.rakshakx.notifications.RakshakNotificationChannels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -77,8 +77,8 @@ class FraudMonitoringForegroundService : Service() {
     }
 
     companion object {
-        private const val MONITORING_CHANNEL_ID = "rakshakx_monitoring"
-        const val ALERTS_CHANNEL_ID = "rakshakx_alerts"
+        private val MONITORING_CHANNEL_ID = RakshakNotificationChannels.STATUS
+        val ALERTS_CHANNEL_ID = RakshakNotificationChannels.ALERTS
         private const val MONITORING_NOTIFICATION_ID = 1001
 
         @Volatile
@@ -113,23 +113,7 @@ class FraudMonitoringForegroundService : Service() {
         }
 
         fun ensureNotificationChannels(context: Context) {
-            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            val monitoringChannel = NotificationChannel(
-                MONITORING_CHANNEL_ID,
-                "RakshakX Monitoring",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Persistent monitoring status notifications"
-            }
-            val alertsChannel = NotificationChannel(
-                ALERTS_CHANNEL_ID,
-                "RakshakX Security Alerts",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "High-risk activity notifications"
-            }
-            manager.createNotificationChannel(monitoringChannel)
-            manager.createNotificationChannel(alertsChannel)
+            RakshakNotificationChannels.bootstrap(context.applicationContext)
         }
     }
 }

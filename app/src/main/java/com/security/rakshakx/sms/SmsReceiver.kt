@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.security.rakshakx.notifications.SmsFraudNotifications
 
 /**
  * SmsReceiver — FALLBACK only on Android 10+.
@@ -13,7 +14,7 @@ import android.util.Log
  * This receiver fires reliably only on Android 9 and below, or if the user
  * has set RakshakX as the default SMS app.
  *
- * Primary detection is handled by NotificationService (NotificationListenerService).
+ * Primary detection is handled by RakshakNotificationListenerService (NotificationListenerService).
  * Keep this registered as a bonus catch for edge cases.
  */
 class SmsReceiver : BroadcastReceiver() {
@@ -31,12 +32,16 @@ class SmsReceiver : BroadcastReceiver() {
             for (sms in messages) {
                 val sender = sms.displayOriginatingAddress ?: "Unknown"
                 val body   = sms.messageBody ?: ""
+                if (!SmsDeduplicationGuard.shouldProcess(context, sender, body)) {
+                    Log.d(TAG, "Skipping duplicate SMS event from broadcast path")
+                    continue
+                }
                 val risk   = RiskEngine.calculate(body, context)
 
                 Log.d(TAG, "From=$sender risk=$risk")
 
                 if (risk >= RiskEngine.ALERT_THRESHOLD) {
-                    NotificationHelper.showFraudAlert(
+                    SmsFraudNotifications.showFraudAlert(
                         context   = context,
                         sender    = sender,
                         message   = body,

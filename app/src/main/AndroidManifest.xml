@@ -20,6 +20,9 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
 
     <!-- Optional browser package visibility -->
     <queries>
@@ -111,8 +114,7 @@
         <service
             android:name=".call.callanalysis.CallRecordingService"
             android:exported="false"
-            android:foregroundServiceType="microphone"
-            tools:replace="android:foregroundServiceType" />
+            android:foregroundServiceType="microphone" />
 
         <!-- Overlay -->
         <service
@@ -126,7 +128,7 @@
 
         <!-- Unified notification listener -->
         <service
-            android:name=".sms.NotificationService"
+            android:name=".notifications.RakshakNotificationListenerService"
             android:exported="true"
             android:label="RakshakX Fraud Guard"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
@@ -158,8 +160,7 @@
             android:name=".web.services.FraudVpnService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
-            android:permission="android.permission.BIND_VPN_SERVICE"
-            tools:replace="android:foregroundServiceType,android:exported">
+            android:permission="android.permission.BIND_VPN_SERVICE">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
@@ -209,7 +210,7 @@
 
         <!-- Notification action -->
         <receiver
-            android:name=".call.callanalysis.NotificationActionReceiver"
+            android:name=".notifications.receivers.NotificationActionReceiver"
             android:exported="false" />
 
     </application>

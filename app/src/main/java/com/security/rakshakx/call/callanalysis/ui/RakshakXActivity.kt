@@ -28,7 +28,7 @@ import com.security.rakshakx.call.callanalysis.DeviceCapabilities
 import com.security.rakshakx.call.callanalysis.FraudIntentClassifier
 import com.security.rakshakx.call.callanalysis.PreActionDecisionEngine
 import com.security.rakshakx.call.callanalysis.RiskConfig
-import com.security.rakshakx.call.callanalysis.RakshakXNotificationManager
+import com.security.rakshakx.notifications.CallFraudNotifications
 import com.security.rakshakx.call.callanalysis.WhisperLiteTranscriber
 import com.security.rakshakx.call.callanalysis.data.CallAnalysisRepository
 import com.security.rakshakx.call.callanalysis.data.CallRecord
@@ -360,7 +360,7 @@ class RakshakXActivity : AppCompatActivity() {
 
                 // Show warning notification if high/medium risk using RiskConfig threshold
                 if (riskScore >= RiskConfig.THRESHOLD_SAFE_ROUTING) {
-                    RakshakXNotificationManager.showRiskNotification(
+                    CallFraudNotifications.showRiskNotification(
                         this@RakshakXActivity,
                         record,
                         decision

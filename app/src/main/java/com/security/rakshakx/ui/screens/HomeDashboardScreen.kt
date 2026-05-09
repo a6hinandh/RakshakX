@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.security.rakshakx.call.CallMainActivity
+import com.security.rakshakx.permissions.PermissionManager
 import com.security.rakshakx.sms.SmsMainActivity
 import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.data.*
@@ -41,6 +42,7 @@ fun HomeDashboardScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val vpnRunning = VpnStatusStore.isRunning.collectAsState().value
+    var readiness by remember { mutableStateOf(PermissionManager.getReadinessState(context)) }
 
     // Load real threats
     var threats by remember { mutableStateOf<List<ThreatLogEntry>>(emptyList()) }
@@ -48,6 +50,7 @@ fun HomeDashboardScreen(
         scope.launch(Dispatchers.IO) {
             threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
         }
+        readiness = PermissionManager.getReadinessState(context)
     }
 
     val criticalCount = threats.count { it.severity == Severity.CRITICAL || it.severity == Severity.HIGH }
@@ -59,10 +62,14 @@ fun HomeDashboardScreen(
     val securityScore = (100 - (criticalCount * 15) - (threats.count { it.severity == Severity.MEDIUM } * 5)).coerceIn(0, 100)
 
     val channelStatuses = listOf(
-        ChannelStatus(Channel.SMS, isActive = true, threatCount = threats.count { it.channel == Channel.SMS }),
-        ChannelStatus(Channel.CALL, isActive = true, threatCount = threats.count { it.channel == Channel.CALL }),
-        ChannelStatus(Channel.WEB, isActive = vpnRunning, threatCount = threats.count { it.channel == Channel.WEB }),
-        ChannelStatus(Channel.EMAIL, isActive = true, threatCount = threats.count { it.channel == Channel.EMAIL }),
+        ChannelStatus(Channel.SMS, isActive = readiness.smsReady, threatCount = threats.count { it.channel == Channel.SMS }),
+        ChannelStatus(Channel.CALL, isActive = readiness.callReady, threatCount = threats.count { it.channel == Channel.CALL }),
+        ChannelStatus(
+            Channel.WEB,
+            isActive = vpnRunning && readiness.webReady,
+            threatCount = threats.count { it.channel == Channel.WEB }
+        ),
+        ChannelStatus(Channel.EMAIL, isActive = readiness.emailReady, threatCount = threats.count { it.channel == Channel.EMAIL }),
     )
 
     Column(

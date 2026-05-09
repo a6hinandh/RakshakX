@@ -6,6 +6,7 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.security.rakshakx.call.services.foreground.FraudMonitoringForegroundService
+import com.security.rakshakx.sms.SmsDeduplicationGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,7 +21,7 @@ class SmsEventReceiver : BroadcastReceiver() {
                 val phoneNumber = first?.originatingAddress
                 val message = messages.joinToString(separator = "") { it.messageBody ?: "" }.ifBlank { null }
 
-                if (!phoneNumber.isNullOrBlank()) {
+                if (!phoneNumber.isNullOrBlank() && SmsDeduplicationGuard.shouldProcess(context, phoneNumber, message)) {
                     val orchestrator = FraudMonitoringForegroundService.getOrchestrator(context)
                     orchestrator.handleSmsEvent(phoneNumber, message)
                 }

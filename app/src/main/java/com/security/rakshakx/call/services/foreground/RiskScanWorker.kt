@@ -3,6 +3,9 @@ package com.security.rakshakx.call.services.foreground
 import android.content.Context
 import android.content.Intent
 import android.app.PendingIntent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
@@ -10,6 +13,7 @@ import androidx.work.WorkerParameters
 import com.security.rakshakx.call.CallMainActivity
 import com.security.rakshakx.call.core.storage.DatabaseFactory
 import com.security.rakshakx.call.core.storage.RiskScoreRepository
+import com.security.rakshakx.permissions.PermissionManager
 
 class RiskScanWorker(
     appContext: Context,
@@ -48,7 +52,17 @@ class RiskScanWorker(
                     .setAutoCancel(true)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .build()
-                NotificationManagerCompat.from(applicationContext).notify(2002, notification)
+                val canNotify = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        applicationContext,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+                if (canNotify && PermissionManager.hasNotificationPermission(applicationContext)) {
+                    NotificationManagerCompat.from(applicationContext).notify(2002, notification)
+                }
             }
             Result.success()
         }.getOrElse {

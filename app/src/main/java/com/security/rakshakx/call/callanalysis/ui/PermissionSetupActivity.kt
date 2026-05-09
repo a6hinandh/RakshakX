@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.security.rakshakx.call.callanalysis.ui
 
 import android.content.Intent
@@ -14,10 +16,15 @@ import com.security.rakshakx.call.callanalysis.PermissionManager
  *
  * Guides user through permission setup with device-specific info.
  */
+@Suppress("DEPRECATION")
 class PermissionSetupActivity : AppCompatActivity() {
 
     private lateinit var permissionManager: PermissionManager
     private lateinit var capabilityChecker: DeviceCapabilityChecker
+    private val statusTextId = android.view.View.generateViewId()
+    private val capabilitiesTextId = android.view.View.generateViewId()
+    private val grantButtonId = android.view.View.generateViewId()
+    private val continueButtonId = android.view.View.generateViewId()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,10 +36,10 @@ class PermissionSetupActivity : AppCompatActivity() {
         permissionManager = PermissionManager(this)
         capabilityChecker = DeviceCapabilityChecker(this)
 
-        val tvStatus = layout.findViewById<TextView>(1)
-        val tvCapabilities = layout.findViewById<TextView>(2)
-        val btnGrant = layout.findViewById<Button>(3)
-        val btnContinue = layout.findViewById<Button>(4)
+        val tvStatus = layout.findViewById<TextView>(statusTextId)
+        val tvCapabilities = layout.findViewById<TextView>(capabilitiesTextId)
+        val btnGrant = layout.findViewById<Button>(grantButtonId)
+        val btnContinue = layout.findViewById<Button>(continueButtonId)
 
         // Show missing permissions
         val missing = permissionManager.getMissingPermissions()
@@ -84,17 +91,17 @@ class PermissionSetupActivity : AppCompatActivity() {
                 setPadding(0, 0, 0, 64)
             })
 
-            // Permission status (id = 1)
+            // Permission status
             addView(TextView(this@PermissionSetupActivity).apply {
-                id = 1
+                id = statusTextId
                 text = "Checking permissions..."
                 textSize = 16f
                 setPadding(0, 0, 0, 48)
             })
 
-            // Device capabilities (id = 2)
+            // Device capabilities
             addView(TextView(this@PermissionSetupActivity).apply {
-                id = 2
+                id = capabilitiesTextId
                 text = "Checking device capabilities..."
                 textSize = 14f
                 setBackgroundColor(android.graphics.Color.parseColor("#F5F5F5"))
@@ -108,9 +115,9 @@ class PermissionSetupActivity : AppCompatActivity() {
                 }
             })
 
-            // Grant permissions button (id = 3)
+            // Grant permissions button
             addView(Button(this@PermissionSetupActivity).apply {
-                id = 3
+                id = grantButtonId
                 text = "Grant Permissions"
                 textSize = 18f
                 setPadding(32, 32, 32, 32)
@@ -122,9 +129,9 @@ class PermissionSetupActivity : AppCompatActivity() {
                 }
             })
 
-            // Continue button (id = 4)
+            // Continue button
             addView(Button(this@PermissionSetupActivity).apply {
-                id = 4
+                id = continueButtonId
                 text = "Continue"
                 textSize = 18f
                 setPadding(32, 32, 32, 32)

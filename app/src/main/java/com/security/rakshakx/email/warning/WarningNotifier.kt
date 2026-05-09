@@ -3,8 +3,9 @@ package com.security.rakshakx.email.warning
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-
+import android.os.Build
 import androidx.core.app.NotificationCompat
+import com.security.rakshakx.notifications.RakshakNotificationChannels
 
 object WarningNotifier {
 
@@ -18,29 +19,27 @@ object WarningNotifier {
 
     ) {
 
-        val channelId = "fraud_warning_channel"
+        RakshakNotificationChannels.bootstrap(context.applicationContext)
 
-        // Notification manager
+        val channelId = RakshakNotificationChannels.EMAIL_PHISHING
+
         val manager =
 
             context.getSystemService(
                 Context.NOTIFICATION_SERVICE
             ) as NotificationManager
 
-        // Create notification channel
-        val channel = NotificationChannel(
-
-            channelId,
-
-            "Fraud Warnings",
-
-            NotificationManager.IMPORTANCE_HIGH
-        )
-
-        channel.description =
-            "RakshakX phishing alerts"
-
-        manager.createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            manager.getNotificationChannel(channelId) == null
+        ) {
+            val channel = NotificationChannel(
+                channelId,
+                "Fraud Warnings",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+            channel.description = "RakshakX phishing alerts"
+            manager.createNotificationChannel(channel)
+        }
 
         // Convert reasons list into readable text
         val reasonText =

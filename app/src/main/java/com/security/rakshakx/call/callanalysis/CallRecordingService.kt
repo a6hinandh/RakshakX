@@ -12,6 +12,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.security.rakshakx.R
+import com.security.rakshakx.notifications.CallFraudNotifications
 import com.security.rakshakx.call.callanalysis.ml.DummyFraudTextModel
 import com.security.rakshakx.call.callanalysis.ml.FraudTextModel
 import kotlinx.coroutines.*
@@ -178,7 +179,7 @@ class CallRecordingService : Service() {
 
                 // Show result notification with score and transcript snippet
                 val riskLevel = RiskConfig.getRiskLevel(hybridScore)
-                FraudNotificationHelper.showFraudResultNotification(
+                CallFraudNotifications.showFraudResultNotification(
                     context = this@CallRecordingService,
                     hybridScore = hybridScore,
                     transcript = transcript,

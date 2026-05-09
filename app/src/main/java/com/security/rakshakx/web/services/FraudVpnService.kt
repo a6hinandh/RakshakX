@@ -25,7 +25,7 @@ import com.security.rakshakx.web.extractors.RedirectChainTracker
 import com.security.rakshakx.web.models.FraudAction
 import com.security.rakshakx.web.models.ThreatAssessment
 import com.security.rakshakx.web.models.VpnTrafficData
-import com.security.rakshakx.web.notifications.VpnProtectionNotifier
+import com.security.rakshakx.notifications.vpn.VpnProtectionNotifier
 import com.security.rakshakx.web.utils.BrowserSessionCache
 import com.security.rakshakx.web.utils.VpnThreatLogger
 import com.security.rakshakx.web.utils.VpnStatusStore
