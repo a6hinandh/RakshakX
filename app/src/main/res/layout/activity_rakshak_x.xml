@@ -22,86 +22,6 @@
         tools:visibility="visible"
         tools:text="✅ Live call analysis is supported on this device." />
 
-    <!-- Scenario Selection Label -->
-    <TextView
-        android:id="@+id/labelScenarios"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="SELECT A TEST SCENARIO"
-        android:textColor="#757575"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:layout_marginTop="16dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvCapabilityStatus" />
-
-    <!-- Scenario Buttons -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnScenario1"
-        style="@style/Widget.Material3.Button"
-        android:layout_width="0dp"
-        android:layout_height="60dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="6dp"
-        android:text="Scenario 1"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textColor="#FFFFFF"
-        app:backgroundTint="#1A237E"
-        app:cornerRadius="12dp"
-        app:layout_constraintEnd_toStartOf="@+id/btnScenario2"
-        app:layout_constraintHorizontal_weight="1"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/labelScenarios" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnScenario2"
-        style="@style/Widget.Material3.Button"
-        android:layout_width="0dp"
-        android:layout_height="60dp"
-        android:layout_marginStart="6dp"
-        android:text="Scenario 2"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textColor="#FFFFFF"
-        app:backgroundTint="#1A237E"
-        app:cornerRadius="12dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_weight="1"
-        app:layout_constraintStart_toEndOf="@id/btnScenario1"
-        app:layout_constraintTop_toTopOf="@id/btnScenario1" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnScenario3"
-        style="@style/Widget.Material3.Button"
-        android:layout_width="0dp"
-        android:layout_height="60dp"
-        android:layout_marginTop="12dp"
-        android:layout_marginEnd="6dp"
-        android:text="Scenario 3"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textColor="#FFFFFF"
-        app:backgroundTint="#1A237E"
-        app:cornerRadius="12dp"
-        app:layout_constraintEnd_toStartOf="@+id/btnScenario4"
-        app:layout_constraintHorizontal_weight="1"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnScenario1" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnScenario4"
-        style="@style/Widget.Material3.Button"
-        android:layout_width="0dp"
-        android:layout_height="60dp"
-        android:layout_marginStart="6dp"
-        android:text="Scenario 4"
-        android:textAppearance="@style/TextAppearance.AppCompat.Body1"
-        android:textColor="#FFFFFF"
-        app:backgroundTint="#1A237E"
-        app:cornerRadius="12dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_weight="1"
-        app:layout_constraintStart_toEndOf="@id/btnScenario3"
-        app:layout_constraintTop_toTopOf="@id/btnScenario3" />
-
     <!-- Log Section Label -->
     <TextView
         android:id="@+id/labelLogs"
@@ -113,7 +33,7 @@
         android:textSize="12sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/btnScenario3" />
+        app:layout_constraintTop_toBottomOf="@id/tvCapabilityStatus" />
 
     <!-- Log Container -->
     <com.google.android.material.card.MaterialCardView

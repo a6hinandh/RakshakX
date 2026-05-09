@@ -2,6 +2,7 @@ package com.security.rakshakx.call.callanalysis
 
 import android.content.Context
 import android.content.Intent
+import androidx.core.content.ContextCompat
 
 /**
  * OverlayBubbleManager
@@ -14,7 +15,7 @@ object OverlayBubbleManager {
         val intent = Intent(context, OverlayBubbleService::class.java).apply {
             putExtra("phone_number", phoneNumber)
         }
-        context.startService(intent)
+        ContextCompat.startForegroundService(context, intent)
     }
 
     fun hideBubble(context: Context) {

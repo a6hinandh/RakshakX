@@ -1,83 +1,75 @@
 package com.security.rakshakx.call.callanalysis
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.PixelFormat
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
-import android.widget.Button
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.security.rakshakx.R
-import com.security.rakshakx.call.callanalysis.data.CallAnalysisRepository
-import com.security.rakshakx.call.callanalysis.data.CallRecord
-import com.security.rakshakx.call.callanalysis.ml.DummyFraudTextModel
-import com.security.rakshakx.call.callanalysis.ml.FraudTextModel
-import kotlinx.coroutines.*
-import java.io.File
 
 class CallOverlayActivity : AppCompatActivity() {
 
-    data class SimulatedCall(
-        val transcript: String,
-        val groundTruthRisk: String,
-        val fraudType: String
-    )
-
     companion object {
         private const val TAG = "CallOverlayActivity"
+        const val ACTION_TRANSCRIPT_UPDATE = "com.security.rakshakx.TRANSCRIPT_UPDATE"
+        const val EXTRA_TRANSCRIPT = "extra_transcript"
     }
 
     private lateinit var windowManager: WindowManager
     private var floatingView: View? = null
+    private lateinit var audioManager: AudioManager
     private lateinit var phoneNumber: String
-    private var isSimulation: Boolean = false
-    private var scenarioId: Int = -1
+    
+    private var isIntercepting = false
 
-    private lateinit var classifier: FraudIntentClassifier
-    private lateinit var mlClassifier: FraudMLClassifier
-    private lateinit var engine: PreActionDecisionEngine
-
-    // Demo components
-    private val whisperLiteTranscriber by lazy { WhisperLiteTranscriber(this) }
-    private val demoAudioPlayer by lazy { DemoAudioPlayer(this) }
-
-    // ML model (pluggable)
-    private val fraudTextModel: FraudTextModel by lazy { DummyFraudTextModel() }
+    private val transcriptReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val transcript = intent?.getStringExtra(EXTRA_TRANSCRIPT) ?: ""
+            updateTranscriptUi(transcript)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         phoneNumber = intent.getStringExtra("phone_number") ?: "Unknown"
-        isSimulation = intent.getBooleanExtra("is_simulation", false)
-        scenarioId = intent.getIntExtra("scenario_id", -1)
-
-        // Initialize classifiers with pluggable ML model
-        classifier = FraudIntentClassifier()
-        mlClassifier = FraudMLClassifier(fraudTextModel)
-        engine = PreActionDecisionEngine()
-
+        audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        
+        registerReceiver(transcriptReceiver, IntentFilter(ACTION_TRANSCRIPT_UPDATE))
+        
         showFloatingWidget()
     }
 
     private fun showFloatingWidget() {
-        if (floatingView != null) {
-            Log.w(TAG, "Widget already shown")
-            return
-        }
+        if (floatingView != null) return
 
-        floatingView = createFloatingWidget()
+        val inflater = LayoutInflater.from(this)
+        floatingView = inflater.inflate(R.layout.activity_call_overlay, null)
 
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -85,297 +77,111 @@ class CallOverlayActivity : AppCompatActivity() {
             PixelFormat.TRANSLUCENT
         )
 
-        params.gravity = Gravity.TOP or Gravity.END
-        params.x = 16
-        params.y = 200
+        params.gravity = Gravity.TOP
+        params.y = 100
+
+        setupWidgetViews(floatingView!!)
 
         try {
             windowManager.addView(floatingView, params)
-            Log.d(TAG, "Floating widget added to WindowManager")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to add floating widget", e)
             finish()
         }
     }
 
-    private fun createFloatingWidget(): View {
-        val container = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setPadding(32, 32, 32, 32)
-            setBackgroundResource(R.drawable.widget_background)
-        }
+    private fun setupWidgetViews(view: View) {
+        val tvPhone = view.findViewById<TextView>(R.id.tvPhoneNumber)
+        val btnDismiss = view.findViewById<ImageButton>(R.id.btnDismiss)
+        val swIntercept = view.findViewById<Switch>(R.id.swIntercept)
+        val tvStatus = view.findViewById<TextView>(R.id.tvStatus)
+        val llAnalysis = view.findViewById<LinearLayout>(R.id.llAnalysis)
+        val tvSpeakerBadge = view.findViewById<TextView>(R.id.tvSpeakerBadge)
 
-        val tvStatus = TextView(this).apply {
-            id = View.generateViewId()
-            text = "Incoming: $phoneNumber"
-            textSize = 16f
-            setTextColor(android.graphics.Color.BLACK)
-        }
-        container.addView(tvStatus)
-
-        val btnAnalyze = Button(this).apply {
-            id = View.generateViewId()
-            text = "Analyze Call"
-            setBackgroundResource(R.drawable.button_analyze)
-            setTextColor(android.graphics.Color.WHITE)
-        }
-        container.addView(btnAnalyze)
-
-        val btnDismiss = Button(this).apply {
-            id = View.generateViewId()
-            text = "Not now"
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-        }
-        container.addView(btnDismiss)
-
-        val statusTextView = tvStatus
-        val analyzeButton = btnAnalyze
-
-        btnAnalyze.setOnClickListener {
-            onAnalyzeClick(statusTextView, analyzeButton)
-        }
+        tvPhone.text = phoneNumber
 
         btnDismiss.setOnClickListener {
+            stopInterception(tvSpeakerBadge)
             removeFloatingWidget()
             finish()
         }
 
-        return container
-    }
-
-    private fun onAnalyzeClick(tvStatus: TextView, btnAnalyze: Button) {
-        tvStatus.text = "Analyzing..."
-        btnAnalyze.isEnabled = false
-
-        if (isSimulation) {
-            if (scenarioId in 1..4) {
-                val scenario = demoScenarios[scenarioId - 1]
-                runAudioScenario(scenario)
+        swIntercept.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                startInterception(tvStatus, llAnalysis, tvSpeakerBadge)
             } else {
-                runSimulatedFraudPipeline()
-            }
-        } else {
-            startRealCallAnalysis()
-        }
-    }
-
-    private fun runAudioScenario(scenario: DemoScenario) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                // 1) Play audio for judges
-                withContext(Dispatchers.Main) {
-                    demoAudioPlayer.playScenarioAudio(scenario.rawResId)
-                }
-
-                // 2) Copy raw to temp path (for Whisper stub)
-                val tempPath = copyRawToTempPath(scenario.rawResId)
-                    ?: run {
-                        Log.e(TAG, "Failed to copy scenario audio")
-                        withContext(Dispatchers.Main) { finish() }
-                        return@launch
-                    }
-
-                // 3) Transcribe via stub Whisper (result ignored for demo)
-                val ignoredTranscription = whisperLiteTranscriber.transcribe(tempPath)
-                Log.d(TAG, "Whisper stub output: $ignoredTranscription")
-
-                // 4) Use your curated dialogue as display transcript
-                val displayTranscript = when (scenario.id) {
-                    DemoRiskLevel.LOW -> "Network thoda weak lag raha hai, but it's okay now, main bas kal ka plan confirm karna chahta hoon."
-                    DemoRiskLevel.MEDIUM -> "Hello Sir, this is a verification call regarding your digital KYC update. Hamare system mein aapke account ke upar ek warning dikh raha hai, agar aaj ke andar verification nahi complete hua toh aapka online access block ho sakta hai."
-                    DemoRiskLevel.HIGH_EN -> "I'm Officer Sharma from Bank Security. We blocked a suspicious ₹12,499 transfer from your account. To cancel this and unblock your card, read back the 6-digit 'Reversal Code' I just sent to your phone now, or your account will be suspended."
-                    DemoRiskLevel.HIGH_MULTI -> "Sir, National Bank se bol raha hoon. Aapke account se 48,000 ka fraud transaction ho raha hai. Isse turant rokne ke liye aapke phone par aaya 6-digit OTP batayein, warna account block ho jayega aur legal action hoga. Jaldi code batayein."
-                }
-
-                // 5) Compute reasons from rules on this clean transcript
-                val fraudResult = classifier.compute(displayTranscript)
-
-                // 6) Force demo scores per scenario id
-                val ruleScore = when (scenario.id) {
-                    DemoRiskLevel.LOW        -> 0.10f   // LOW RISK, safe routing
-                    DemoRiskLevel.MEDIUM     -> 0.40f   // MEDIUM RISK, still safe routing
-                    DemoRiskLevel.HIGH_EN    -> 0.80f   // CRITICAL RISK, goes to alert
-                    DemoRiskLevel.HIGH_MULTI -> 0.90f   // CRITICAL RISK, goes to alert
-                }
-
-                // 7) Decision engine
-                val decision = engine.decideAction(ruleScore)
-
-                // 8) Save to database
-                val repository = CallAnalysisRepository(this@CallOverlayActivity)
-                val record = CallRecord(
-                    phoneNumber = phoneNumber,
-                    transcript = displayTranscript,
-                    riskScore = ruleScore,
-                    action = decision.action.name,
-                    reason = fraudResult.reasons.joinToString("\n"),
-                    timestamp = System.currentTimeMillis()
-                )
-                repository.saveCallRecord(record)
-
-                // 9) Short analysis delay for UX (1.5s)
-                delay(10000)
-
-                withContext(Dispatchers.Main) {
-                    demoAudioPlayer.stopAudio() // Stop audio immediately before results
-                    removeFloatingWidget()
-                    routeToResultScreen(record)
-                    finish()
-                }
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Audio scenario analysis failed", e)
-                withContext(Dispatchers.Main) {
-                    demoAudioPlayer.stopAudio()
-                    removeFloatingWidget()
-                    finish()
-                }
+                stopInterception(tvSpeakerBadge)
+                tvStatus.text = "Ready for interception"
+                llAnalysis.visibility = View.GONE
             }
         }
     }
 
-    private fun runSimulatedFraudPipeline() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                // Ground truth simulation data
-                val simulationDataset = listOf(
-                    SimulatedCall(
-                        "Sir, urgent! Your bank account will be suspended in 5 minutes. Please share your OTP and CVV immediately to prevent blocking.",
-                        "CRITICAL", "Phishing"
-                    ),
-                    SimulatedCall(
-                        "This is calling from bank fraud department. Your account has been hacked. Provide your credit card number, CVV and OTP right now or police case will be filed.",
-                        "CRITICAL", "Social Engineering"
-                    ),
-                    SimulatedCall(
-                        "Congratulations! You won lottery jackpot of 1 crore rupees! Send Rs 5000 via UPI immediately to claim your prize or it will expire.",
-                        "HIGH", "Lottery Scam"
-                    ),
-                    SimulatedCall(
-                        "Hi! How are you doing? Let's grab lunch after the office meeting tomorrow around 1 PM.",
-                        "SAFE", "Normal"
-                    ),
-                    SimulatedCall(
-                        "Hey, did you finish the college assignment? Professor said the deadline is next week.",
-                        "SAFE", "Normal"
-                    )
-                )
-
-                val selectedCall = simulationDataset.random()
-                val fakeTranscript = selectedCall.transcript
-
-                Log.d(TAG, "Simulating: ${selectedCall.groundTruthRisk} | ${selectedCall.fraudType}")
-
-                // Tier-1: ML Classification
-                val mlResult = mlClassifier.computeMLResult(fakeTranscript)
-                Log.d(TAG, "ML Score: ${mlResult.score}")
-
-                // Tier-0 + Tier-1: Hybrid scoring
-                val (hybridScore, explanation) = classifier.computeHybridScore(fakeTranscript, mlResult)
-                Log.d(TAG, "Hybrid Score: $hybridScore")
-
-                // Update Debug UI on Main Thread
-                withContext(Dispatchers.Main) {
-                    showDebugInfo(selectedCall, mlResult.score, classifier.compute(fakeTranscript).score, hybridScore)
-                }
-
-                // Decision engine
-                val decision = engine.decideAction(hybridScore)
-                Log.d(TAG, "Decision: ${decision.action}, Reason: ${decision.reason}")
-
-                // Save to database
-                val repository = CallAnalysisRepository(this@CallOverlayActivity)
-                val record = CallRecord(
-                    phoneNumber = phoneNumber,
-                    transcript = fakeTranscript,
-                    riskScore = hybridScore,
-                    action = decision.action.name,
-                    reason = explanation,
-                    timestamp = System.currentTimeMillis()
-                )
-                repository.saveCallRecord(record)
-
-                // Simulate analysis delay
-                delay(1500)
-
-                withContext(Dispatchers.Main) {
-                    demoAudioPlayer.stopAudio() // Stop audio immediately before results
-                    removeFloatingWidget()
-                    routeToResultScreen(record)
-                    finish()
-                }
-
-            } catch (e: Exception) {
-                Log.e(TAG, "Simulation analysis failed", e)
-                withContext(Dispatchers.Main) {
-                    demoAudioPlayer.stopAudio()
-                    removeFloatingWidget()
-                    finish()
-                }
-            }
-        }
-    }
-
-    /**
-     * Start real call analysis using foreground service.
-     */
-    private fun startRealCallAnalysis() {
+    private fun startInterception(
+        tvStatus: TextView,
+        llAnalysis: LinearLayout,
+        tvSpeakerBadge: TextView
+    ) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Microphone permission required for real analysis", Toast.LENGTH_LONG).show()
-            removeFloatingWidget()
-            finish()
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_LONG).show()
             return
         }
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            // Ensure capability probe is run
-            if (!DeviceCapabilities.hasRunProbe(this@CallOverlayActivity)) {
-                val probe = CallRecordingProbe()
-                val result = probe.runProbe()
-                DeviceCapabilities.setSupportsCallRecording(this@CallOverlayActivity, result.success && result.hasSignal)
-                DeviceCapabilities.setHasRunProbe(this@CallOverlayActivity, true)
-            }
+        isIntercepting = true
+        tvStatus.text = "Listening..."
+        tvStatus.setTextColor(ContextCompat.getColor(this, android.R.color.holo_blue_light))
+        llAnalysis.visibility = View.VISIBLE
+        llAnalysis.findViewById<TextView>(R.id.tvTranscript)?.text = "Listening..."
+        tvSpeakerBadge.visibility = View.VISIBLE
 
-            withContext(Dispatchers.Main) {
-                if (DeviceCapabilities.supportsCallRecording(this@CallOverlayActivity)) {
-                    CallRecordingService.startRecording(this@CallOverlayActivity, phoneNumber)
-                    removeFloatingWidget()
-                    finish()
-                } else {
-                    Toast.makeText(this@CallOverlayActivity, "In-call audio is blocked on this device. Simulation mode only.", Toast.LENGTH_LONG).show()
-                    runSimulatedFraudPipeline()
-                }
+        // 1. Force Speakerphone
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = true
+        
+        // 2. Start Recording Service
+        CallRecordingService.startRecording(this, phoneNumber)
+        
+        Toast.makeText(this, "Speakerphone ON - Intercepting...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun stopInterception(tvSpeakerBadge: TextView) {
+        if (!isIntercepting) return
+        
+        isIntercepting = false
+        audioManager.isSpeakerphoneOn = false
+        audioManager.mode = AudioManager.MODE_NORMAL
+
+        tvSpeakerBadge.visibility = View.GONE
+        
+        CallRecordingService.stopRecording(this)
+    }
+
+    private fun updateTranscriptUi(transcript: String) {
+        floatingView?.let {
+            val tvTranscript = it.findViewById<TextView>(R.id.tvTranscript)
+            tvTranscript.text = if (transcript.isBlank()) "Listening..." else transcript
+            if (transcript.isNotBlank()) {
+                triggerTranscriptHaptic()
             }
         }
     }
 
-    private fun routeToResultScreen(record: CallRecord) {
-        if (record.riskScore >= RiskConfig.THRESHOLD_SAFE_ROUTING) {
-            showFullScreenDangerAlert(record)
+    private fun triggerTranscriptHaptic() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator.vibrate(effect)
+            } else {
+                val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+                vibrator.vibrate(effect)
+            }
         } else {
-            showSafeCallScreen(record)
+            @Suppress("DEPRECATION")
+            val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(30)
         }
-    }
-
-    private fun showFullScreenDangerAlert(record: CallRecord) {
-        val intent = Intent(this, FraudAlertActivity::class.java).apply {
-            putExtra("phone_number", record.phoneNumber)
-            putExtra("risk_score", record.riskScore)
-            putExtra("reason", record.reason)
-            putExtra("transcript", record.transcript)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        startActivity(intent)
-    }
-
-    private fun showSafeCallScreen(record: CallRecord) {
-        val intent = Intent(this, SafeCallActivity::class.java).apply {
-            putExtra("phone_number", record.phoneNumber)
-            putExtra("risk_score", record.riskScore)
-            putExtra("reason", record.reason)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        startActivity(intent)
     }
 
     private fun removeFloatingWidget() {
@@ -383,51 +189,18 @@ class CallOverlayActivity : AppCompatActivity() {
             try {
                 windowManager.removeView(it)
                 floatingView = null
-                Log.d(TAG, "Floating widget removed")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to remove widget", e)
             }
         }
     }
 
-    private fun showDebugInfo(call: SimulatedCall, mlScore: Float, ruleScore: Float, hybridScore: Float) {
-        val debugText = """
-            [DEBUG] Ground Truth: ${call.groundTruthRisk} (${call.fraudType})
-            ML: ${(mlScore * 100).toInt()}% | Rules: ${(ruleScore * 100).toInt()}%
-            Final Hybrid: ${(hybridScore * 100).toInt()}%
-        """.trimIndent()
-
-        val tvDebug = TextView(this).apply {
-            text = debugText
-            textSize = 10f
-            setTextColor(android.graphics.Color.DKGRAY)
-            setPadding(16, 16, 16, 16)
-        }
-
-        (floatingView as? android.widget.LinearLayout)?.addView(tvDebug, 0)
-    }
-
-    // Helper: copy res/raw audio to a temp file path
-    private fun copyRawToTempPath(rawResId: Int): String? {
-        return try {
-            val inputStream = resources.openRawResource(rawResId)
-            val tempFile = File(cacheDir, "scenario_${rawResId}.m4a")
-
-            inputStream.use { input ->
-                tempFile.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-            tempFile.absolutePath
-        } catch (e: Exception) {
-            Log.e(TAG, "copyRawToTempPath failed", e)
-            null
-        }
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        demoAudioPlayer.stopAudio()
+        unregisterReceiver(transcriptReceiver)
+        floatingView?.findViewById<TextView>(R.id.tvSpeakerBadge)?.let { badge ->
+            stopInterception(badge)
+        }
         removeFloatingWidget()
     }
 }

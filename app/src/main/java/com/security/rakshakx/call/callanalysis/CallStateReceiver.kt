@@ -20,18 +20,15 @@ class CallStateReceiver : BroadcastReceiver() {
 
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
-                // Incoming call detected - show widget!
                 Log.d(TAG, "Incoming call from: $phoneNumber")
-                showCallOverlayWidget(context, phoneNumber ?: "Unknown")
+                OverlayBubbleManager.showBubble(context, phoneNumber ?: "Unknown")
             }
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                // Call answered
                 Log.d(TAG, "Call answered")
             }
             TelephonyManager.EXTRA_STATE_IDLE -> {
-                // Call ended
                 Log.d(TAG, "Call ended")
-                notifyCallEnded(context)
+                OverlayBubbleManager.hideBubble(context)
             }
         }
     }

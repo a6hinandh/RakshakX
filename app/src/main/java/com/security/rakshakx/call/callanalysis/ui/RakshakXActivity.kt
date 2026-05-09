@@ -1,16 +1,12 @@
 package com.security.rakshakx.call.callanalysis.ui
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.CallLog
-import android.provider.Settings
 import android.util.Log
-import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,7 +18,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.security.rakshakx.R
 import com.security.rakshakx.RakshakXApplication
 import com.security.rakshakx.call.callanalysis.CallAudioRecorder
-import com.security.rakshakx.call.callanalysis.CallOverlayActivity
 import com.security.rakshakx.call.callanalysis.CallRecordingProbe
 import com.security.rakshakx.call.callanalysis.DeviceCapabilities
 import com.security.rakshakx.call.callanalysis.FraudIntentClassifier
@@ -97,7 +92,7 @@ class RakshakXActivity : AppCompatActivity() {
             if (isGranted) {
                 startCallStateMonitorIfPossible()
             } else {
-                // App still works (simulation, manual analysis), just no real-call bubble
+                // App still works (manual analysis), just no real-call bubble
                 Toast.makeText(
                     this,
                     "READ_PHONE_STATE permission denied. Real-call overlay will be disabled.",
@@ -119,19 +114,6 @@ class RakshakXActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
-        findViewById<Button>(R.id.btnScenario1).setOnClickListener {
-            startScenario(1)
-        }
-        findViewById<Button>(R.id.btnScenario2).setOnClickListener {
-            startScenario(2)
-        }
-        findViewById<Button>(R.id.btnScenario3).setOnClickListener {
-            startScenario(3)
-        }
-        findViewById<Button>(R.id.btnScenario4).setOnClickListener {
-            startScenario(4)
-        }
-
         checkAndRequestPermissions()
         ensureReadPhoneStatePermission()
 
@@ -152,7 +134,7 @@ class RakshakXActivity : AppCompatActivity() {
             if (!supported) {
                 tvCapabilityStatus.visibility = android.view.View.VISIBLE
                 tvCapabilityStatus.text =
-                    "⚠️ Your device blocks in-call audio capture. Live analysis will be limited to simulations."
+                    "⚠️ Your device blocks in-call audio capture. Live analysis may be limited."
             } else {
                 tvCapabilityStatus.visibility = android.view.View.VISIBLE
                 tvCapabilityStatus.text = "✅ Live call analysis is supported on this device."
@@ -396,36 +378,7 @@ class RakshakXActivity : AppCompatActivity() {
         }
     }
 
-    private fun startScenario(scenarioId: Int) {
-        // Check overlay permission first
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-            Toast.makeText(
-                this,
-                "Overlay permission required. Redirecting to settings...",
-                Toast.LENGTH_LONG
-            ).show()
-            val intent = Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:$packageName")
-            )
-            startActivity(intent)
-            return
-        }
-
-        // Show the call overlay widget for a specific scenario
-        val overlayIntent = Intent(this, CallOverlayActivity::class.java).apply {
-            putExtra("phone_number", "Unknown")
-            putExtra("is_simulation", true)
-            putExtra("scenario_id", scenarioId)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        startActivity(overlayIntent)
-
-        Log.d(
-            "RakshakXActivity",
-            "Scenario $scenarioId widget shown. Waiting for user to tap Analyze..."
-        )
-    }
+    
 }
 
 

@@ -3,8 +3,12 @@ package com.security.rakshakx.call.callanalysis
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.security.rakshakx.R
@@ -52,10 +56,31 @@ class FraudAlertActivity : AppCompatActivity() {
         // Display detailed explanation
         findViewById<TextView>(R.id.tvReason).text = reason
 
+        triggerHapticAlert()
+
         // Auto-dismiss after 5 seconds (Hackathon demo requirement: no call controls)
         Handler(Looper.getMainLooper()).postDelayed({
             finish()
         }, 5000)
+    }
+
+    private fun triggerHapticAlert() {
+        val pattern = longArrayOf(0, 150, 80, 200, 80, 300)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = VibrationEffect.createWaveform(pattern, -1)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator.vibrate(effect)
+            } else {
+                val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+                vibrator.vibrate(effect)
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(pattern, -1)
+        }
     }
 }
 

@@ -115,83 +115,59 @@ class CallRecordingService : Service() {
     private fun startRecordingAndAnalysis(phoneNumber: String) {
         scope.launch(Dispatchers.IO) {
             try {
-                // STRICT RECORD_AUDIO CHECK BEFORE STARTING PCM
-                if (ContextCompat.checkSelfPermission(
-                        this@CallRecordingService,
-                        Manifest.permission.RECORD_AUDIO
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    Log.e("CallRecordingService", "RECORD_AUDIO not granted, cannot start PCM recording")
-                    updateNotification(phoneNumber, "Analysis unavailable - mic permission missing")
-                    stopSelf()
-                    return@launch
-                }
-
-                // PCM Recording for Whisper
-                val audioPath = recorder.startPcmRecording()
-                if (audioPath == null) {
-                    updateNotification(phoneNumber, "Analysis unavailable - recording failed")
+                if (ContextCompat.checkSelfPermission(this@CallRecordingService, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                     stopSelf()
                     return@launch
                 }
 
                 // Update notification
-                updateNotification(phoneNumber, "Recording & Analyzing...")
+                updateNotification(phoneNumber, "Listening for fraud patterns...")
 
-                // Record for 10 seconds (optimized for initial call analysis)
-                delay(10_000)
-                recorder.stopRecording()
+                // Continuous Interception Loop
+                while (isActive) {
+                    // 1. Record a 5-second chunk
+                    val audioPath = recorder.startPcmRecording() ?: break
+                    delay(5000)
+                    recorder.stopRecording()
 
-                // Transcribe
-                updateNotification(phoneNumber, "Transcribing audio (offline)...")
-                val pcmData = recorder.getPcmData() ?: throw Exception("Failed to read PCM data")
+                    // 2. Transcribe Chunk
+                    val pcmData = recorder.getPcmData() ?: continue
+                    val transcript = try {
+                        withTimeout(5000) { transcriber.transcribePcm(pcmData) }
+                    } catch (_: Exception) { "" }
 
-                // Add timeout for transcription
-                val transcript = withTimeout(10_000) {
-                    transcriber.transcribePcm(pcmData)
+                    if (transcript.isNotBlank()) {
+                        // 3. Broadcast to Overlay
+                        val intent = Intent(CallOverlayActivity.ACTION_TRANSCRIPT_UPDATE).apply {
+                            putExtra(CallOverlayActivity.EXTRA_TRANSCRIPT, transcript)
+                        }
+                        sendBroadcast(intent)
+
+                        // 4. Hybrid Analysis
+                        val mlResult = mlClassifier.computeMLResult(transcript)
+                        val (hybridScore, explanation) = classifier.computeHybridScore(transcript, mlResult)
+
+                        Log.d(TAG, "Live Analysis: score=$hybridScore, transcript=$transcript")
+
+                        // 5. Trigger Alert if High Risk
+                        if (hybridScore >= RiskConfig.THRESHOLD_HIGH) {
+                            withContext(Dispatchers.Main) {
+                                FraudAlertActivity.showHighRiskWarning(
+                                    this@CallRecordingService,
+                                    phoneNumber,
+                                    hybridScore,
+                                    explanation
+                                )
+                            }
+                            // Persist result
+                            saveCallRecord(phoneNumber, transcript, hybridScore, explanation, engine.decideAction(hybridScore))
+                            break // Stop loop after alert
+                        }
+                    }
                 }
-
-                // Hybrid Fraud Analysis
-                updateNotification(phoneNumber, "Detecting fraud patterns...")
-
-                val mlResult = mlClassifier.computeMLResult(transcript)
-
-                // Log ML score for debugging and monitoring
-                Log.d(
-                    "RakshakX",
-                    "ML score=${String.format("%.2f", mlResult.score)}, " +
-                    "reasons=${mlResult.reasons.joinToString("; ")}, " +
-                    "label=${mlResult.label}"
-                )
-
-                val (hybridScore, explanation) = classifier.computeHybridScore(transcript, mlResult)
-                val decision = engine.decideAction(hybridScore)
-
-                // Show result notification and/or high-risk warning
-                if (hybridScore >= RiskConfig.THRESHOLD_HIGH) {
-                    FraudAlertActivity.showHighRiskWarning(
-                        this@CallRecordingService,
-                        phoneNumber,
-                        hybridScore,
-                        explanation
-                    )
-                }
-
-                // Show result notification with score and transcript snippet
-                val riskLevel = RiskConfig.getRiskLevel(hybridScore)
-                CallFraudNotifications.showFraudResultNotification(
-                    context = this@CallRecordingService,
-                    hybridScore = hybridScore,
-                    transcript = transcript,
-                    riskLevel = riskLevel
-                )
-
-                // Persist result
-                saveCallRecord(phoneNumber, transcript, hybridScore, explanation, decision)
 
             } catch (e: Exception) {
-                Log.e("CallRecordingService", "Analysis failed", e)
-                updateNotification(phoneNumber, "Analysis unavailable - error occurred")
+                Log.e(TAG, "Live Interception failed", e)
             } finally {
                 stopSelf()
             }
