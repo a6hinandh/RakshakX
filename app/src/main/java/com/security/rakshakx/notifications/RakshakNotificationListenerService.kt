@@ -209,12 +209,27 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    private fun handleEmailNotification(pkg: String, title: String, body: String) {
+    private fun handleEmailNotification(
+        pkg: String,
+        title: String,
+        body: String
+    ) {
+
+        Log.d(
+            "EMAIL_PIPELINE",
+            "PROCESSING EMAIL: $title"
+        )
+
         EmailThreatPipeline.process(
+
             context = this,
+
             title = title,
+
             body = body,
+
             persistenceScope = coroutineScope,
+
             logPrefix = "Processing Email from: $pkg"
         )
     }
