@@ -131,7 +131,11 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         Log.d("RAKSHAK_LISTENER", "BIG TEXT = $bigText")
 
         val body = bigText.ifBlank { text }
-
+        if (
+            title.contains("new messages", true)
+        ) {
+            return
+        }
         if (body.isBlank()) return
 
         Log.d(
