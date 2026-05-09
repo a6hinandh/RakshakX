@@ -1,6 +1,5 @@
 package com.security.rakshakx.email.listener
 
-import com.security.rakshakx.email.warning.WarningNotifier
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -9,46 +8,32 @@ import com.security.rakshakx.email.analyzer.AttachmentAnalyzer
 import com.security.rakshakx.email.analyzer.IntentAnalyzer
 import com.security.rakshakx.email.analyzer.ObfuscationAnalyzer
 import com.security.rakshakx.email.analyzer.UrlAnalyzer
+import com.security.rakshakx.email.analyzer.UrlReputationAnalyzer
+
+import com.security.rakshakx.email.database.ThreatDatabase
+import com.security.rakshakx.email.database.ThreatEntity
+
 import com.security.rakshakx.email.model.EmailFeatures
+
 import com.security.rakshakx.email.scoring.RiskEngine
+import com.security.rakshakx.email.scoring.ThreatCorrelationEngine
+
 import com.security.rakshakx.email.utils.TextNormalizer
+
+import com.security.rakshakx.email.warning.WarningNotifier
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-import com.security.rakshakx.email.database.ThreatDatabase
-import com.security.rakshakx.email.database.ThreatEntity
+class EmailNotificationListener :
+    NotificationListenerService() {
 
-class EmailNotificationListener : NotificationListenerService() {
-
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
+    override fun onNotificationPosted(
+        sbn: StatusBarNotification
+    ) {
 
         val packageName = sbn.packageName
-
-        // Only analyze Gmail notifications
-        val supportedEmailApps = listOf(
-
-            "com.google.android.gm",                  // Gmail
-
-            "com.microsoft.office.outlook",          // Outlook
-
-            "com.yahoo.mobile.client.android.mail",  // Yahoo Mail
-
-            "com.samsung.android.email.provider",    // Samsung Email
-
-            "ch.protonmail.android",                 // Proton Mail
-
-            "com.easilydo.mail",                     // Edison Mail
-
-            "com.readdle.spark",                     // Spark Mail
-
-            "com.security.rakshakx"                  // Internal testing
-        )
-
-        if (!supportedEmailApps.contains(packageName)) {
-            return
-        }
 
         val extras = sbn.notification.extras
 
@@ -58,6 +43,46 @@ class EmailNotificationListener : NotificationListenerService() {
         val text =
             extras.getCharSequence("android.text")
                 ?.toString() ?: ""
+
+        // Ignore RakshakX warning notifications
+        if (
+
+            packageName == "com.security.rakshakx"
+
+            &&
+
+            title.contains(
+                "HIGH RISK EMAIL DETECTED",
+                true
+            )
+        ) {
+            return
+        }
+
+        // Supported email apps
+        val supportedEmailApps = listOf(
+
+            "com.google.android.gm",
+
+            "com.microsoft.office.outlook",
+
+            "com.yahoo.mobile.client.android.mail",
+
+            "com.samsung.android.email.provider",
+
+            "ch.protonmail.android",
+
+            "com.easilydo.mail",
+
+            "com.readdle.spark",
+
+            // Internal testing
+            "com.security.rakshakx"
+        )
+
+        if (!supportedEmailApps.contains(packageName)) {
+            return
+        }
 
         val fullText = "$title $text"
 
@@ -74,6 +99,43 @@ class EmailNotificationListener : NotificationListenerService() {
 
         val multipleLinks =
             UrlAnalyzer.hasMultipleLinks(urls)
+
+        // URL Reputation Analysis
+        val urlReputationReasons =
+            mutableListOf<String>()
+
+        urls.forEach { url ->
+
+            val reputationIssues =
+
+                UrlReputationAnalyzer
+                    .analyzeUrl(url)
+
+            reputationIssues.forEach {
+
+                Log.d(
+                    "RakshakX",
+                    "URL Reputation Issue: $it"
+                )
+            }
+
+            urlReputationReasons
+                .addAll(reputationIssues)
+        }
+
+        // Threat correlation analysis
+        val correlationReasons =
+
+            ThreatCorrelationEngine
+                .processUrls(urls)
+
+        correlationReasons.forEach {
+
+            Log.d(
+                "RakshakX",
+                "Threat Correlation: $it"
+            )
+        }
 
         // STEP 3 — Intent Analysis
         val suspiciousIntent =
@@ -104,28 +166,36 @@ class EmailNotificationListener : NotificationListenerService() {
 
         // STEP 5 — Financial/Urgency Checks
         val hasUrgency = listOf(
+
             "urgent",
             "immediately",
             "act now",
             "warning"
+
         ).any {
+
             normalizedText.contains(it, true)
         }
 
         val hasFinancialWords = listOf(
+
             "bank",
             "account",
             "payment",
             "verify"
+
         ).any {
+
             normalizedText.contains(it, true)
         }
 
         // STEP 6 — Attachment Analysis
         val dangerousAttachment =
-            AttachmentAnalyzer.hasDangerousAttachment(
-                normalizedText
-            )
+
+            AttachmentAnalyzer
+                .hasDangerousAttachment(
+                    normalizedText
+                )
 
         // STEP 7 — Build Feature Object
         val features = EmailFeatures(
@@ -138,21 +208,29 @@ class EmailNotificationListener : NotificationListenerService() {
 
             hasUrgency = hasUrgency,
 
-            hasFinancialWords = hasFinancialWords,
+            hasFinancialWords =
+                hasFinancialWords,
 
-            suspiciousIntent = suspiciousIntent,
+            suspiciousIntent =
+                suspiciousIntent,
 
-            suspiciousPhraseCount = suspiciousPhraseCount,
+            suspiciousPhraseCount =
+                suspiciousPhraseCount,
 
-            excessiveCaps = excessiveCaps,
+            excessiveCaps =
+                excessiveCaps,
 
-            symbolReplacement = symbolReplacement,
+            symbolReplacement =
+                symbolReplacement,
 
-            repeatedSymbols = repeatedSymbols,
+            repeatedSymbols =
+                repeatedSymbols,
 
-            multipleLinks = multipleLinks,
+            multipleLinks =
+                multipleLinks,
 
-            dangerousAttachment = dangerousAttachment
+            dangerousAttachment =
+                dangerousAttachment
         )
 
         // STEP 8 — Risk Scoring
@@ -164,30 +242,97 @@ class EmailNotificationListener : NotificationListenerService() {
         Log.d("RakshakX", "EMAIL DETECTED")
         Log.d("RakshakX", "==============")
 
-        Log.d("RakshakX", "Original Text: $fullText")
-        Log.d("RakshakX", "Normalized Text: $normalizedText")
+        Log.d(
+            "RakshakX",
+            "Original Text: $fullText"
+        )
 
-        Log.d("RakshakX", "URLs: $urls")
+        Log.d(
+            "RakshakX",
+            "Normalized Text: $normalizedText"
+        )
 
-        Log.d("RakshakX", "Has Link: $hasLink")
-        Log.d("RakshakX", "Multiple Links: $multipleLinks")
+        Log.d(
+            "RakshakX",
+            "URLs: $urls"
+        )
 
-        Log.d("RakshakX", "Suspicious Intent: $suspiciousIntent")
-        Log.d("RakshakX", "Phrase Count: $suspiciousPhraseCount")
+        Log.d(
+            "RakshakX",
+            "Has Link: $hasLink"
+        )
 
-        Log.d("RakshakX", "Excessive Caps: $excessiveCaps")
-        Log.d("RakshakX", "Symbol Replacement: $symbolReplacement")
-        Log.d("RakshakX", "Repeated Symbols: $repeatedSymbols")
+        Log.d(
+            "RakshakX",
+            "Multiple Links: $multipleLinks"
+        )
 
-        Log.d("RakshakX", "Dangerous Attachment: $dangerousAttachment")
+        Log.d(
+            "RakshakX",
+            "Suspicious Intent: $suspiciousIntent"
+        )
 
-        Log.d("RakshakX", "Risk Score: ${result.score}")
-        Log.d("RakshakX", "Risk Level: ${result.riskLevel}")
+        Log.d(
+            "RakshakX",
+            "Phrase Count: $suspiciousPhraseCount"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Excessive Caps: $excessiveCaps"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Symbol Replacement: $symbolReplacement"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Repeated Symbols: $repeatedSymbols"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Dangerous Attachment: $dangerousAttachment"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Risk Score: ${result.score}"
+        )
+
+        Log.d(
+            "RakshakX",
+            "Risk Level: ${result.riskLevel}"
+        )
 
         Log.d("RakshakX", "Reasons:")
 
         result.reasons.forEach {
-            Log.d("RakshakX", "- $it")
+
+            Log.d(
+                "RakshakX",
+                "- $it"
+            )
+        }
+
+        // URL reputation reasons
+        urlReputationReasons.forEach {
+
+            Log.d(
+                "RakshakX",
+                "- URL Threat: $it"
+            )
+        }
+
+        // Correlation reasons
+        correlationReasons.forEach {
+
+            Log.d(
+                "RakshakX",
+                "- Correlation Threat: $it"
+            )
         }
 
         // Show warning notification
@@ -199,37 +344,46 @@ class EmailNotificationListener : NotificationListenerService() {
 
                 title = fullText,
 
-                reasons = result.reasons
+                reasons =
+
+                    result.reasons +
+                            urlReputationReasons +
+                            correlationReasons
             )
 
             // Save threat into database
-            CoroutineScope(Dispatchers.IO).launch {
+            CoroutineScope(Dispatchers.IO)
+                .launch {
 
-                val database =
-                    ThreatDatabase.getDatabase(this@EmailNotificationListener)
+                    val database =
 
-                val threat = ThreatEntity(
+                        ThreatDatabase.getDatabase(
+                            this@EmailNotificationListener
+                        )
 
-                    title = title,
+                    val threat = ThreatEntity(
 
-                    message = fullText,
+                        title = title,
 
-                    riskScore = result.score,
+                        message = fullText,
 
-                    riskLevel = result.riskLevel,
+                        riskScore = result.score,
 
-                    timestamp = System.currentTimeMillis()
-                )
+                        riskLevel = result.riskLevel,
 
-                database
-                    .threatDao()
-                    .insertThreat(threat)
+                        timestamp =
+                            System.currentTimeMillis()
+                    )
 
-                Log.d(
-                    "RakshakX",
-                    "Threat saved into database"
-                )
-            }
+                    database
+                        .threatDao()
+                        .insertThreat(threat)
+
+                    Log.d(
+                        "RakshakX",
+                        "Threat saved into database"
+                    )
+                }
         }
     }
 }
