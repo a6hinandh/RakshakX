@@ -77,6 +77,11 @@ fun RakshakXNavHost(
                         navController.navigate(Screen.LiveThreat.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.Settings.route) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -93,7 +98,7 @@ fun RakshakXNavHost(
                 LiveThreatScreen()
             }
             composable(Screen.Settings.route) {
-                SettingsScreen()
+                SettingsScreen(activity = activity)
             }
         }
     }

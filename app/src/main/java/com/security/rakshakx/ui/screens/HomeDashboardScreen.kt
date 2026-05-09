@@ -34,7 +34,8 @@ fun HomeDashboardScreen(
     activity: Activity,
     onNavigateToThreats: () -> Unit,
     onNavigateToCorrelation: () -> Unit,
-    onNavigateToLiveThreat: () -> Unit
+    onNavigateToLiveThreat: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val colors = LocalRakshakXColors.current
     val context = LocalContext.current
@@ -112,7 +113,13 @@ fun HomeDashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             channelStatuses.drop(2).forEach { status ->
-                ChannelShieldCard(status = status, modifier = Modifier.weight(1f))
+                ChannelShieldCard(
+                    status = status,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (status.channel == Channel.WEB) onNavigateToSettings()
+                    }
+                )
             }
         }
 

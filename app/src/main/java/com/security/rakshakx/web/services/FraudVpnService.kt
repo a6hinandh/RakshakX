@@ -82,7 +82,7 @@ class FraudVpnService : VpnService() {
                     startForeground(
                         NOTIFICATION_ID,
                         notifier.buildForegroundNotification(),
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
                     )
                 } else {
                     startForeground(NOTIFICATION_ID, notifier.buildForegroundNotification())

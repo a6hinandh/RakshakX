@@ -1,5 +1,9 @@
 package com.security.rakshakx.ui.screens
 
+import android.app.Activity
+import android.net.VpnService
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -19,9 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.security.rakshakx.ui.components.SectionHeader
 import com.security.rakshakx.ui.theme.*
+import com.security.rakshakx.web.services.FraudVpnService
+import com.security.rakshakx.web.utils.VpnStatusStore
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(activity: Activity) {
     val colors = LocalRakshakXColors.current
 
     // Settings state
@@ -29,9 +35,16 @@ fun SettingsScreen() {
     var autoDeleteDays by remember { mutableStateOf(30) }
     var smsEnabled by remember { mutableStateOf(true) }
     var callEnabled by remember { mutableStateOf(true) }
-    var webEnabled by remember { mutableStateOf(true) }
     var emailEnabled by remember { mutableStateOf(true) }
     var seniorMode by remember { mutableStateOf(false) }
+
+    // Real VPN state
+    val webEnabled by VpnStatusStore.isRunning.collectAsState()
+    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            FraudVpnService.start(activity.applicationContext)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -115,10 +128,18 @@ fun SettingsScreen() {
         )
         SettingsToggle(
             icon = Icons.Filled.Language,
-            title = "Web Shield",
-            description = "VPN-based web traffic analysis",
+            title = "Web Shield (VPN)",
+            description = "Intercepts web traffic to block phishing sites",
             isChecked = webEnabled,
-            onCheckedChange = { webEnabled = it },
+            onCheckedChange = { enable ->
+                if (enable) {
+                    val intent = VpnService.prepare(activity)
+                    if (intent != null) vpnLauncher.launch(intent)
+                    else FraudVpnService.start(activity.applicationContext)
+                } else {
+                    FraudVpnService.stop(activity.applicationContext)
+                }
+            },
             iconColor = GreenSafe
         )
         SettingsToggle(
