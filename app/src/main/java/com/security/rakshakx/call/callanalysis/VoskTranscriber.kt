@@ -74,6 +74,18 @@ class VoskTranscriber(
 
             true
 
+        } catch (e: UnsatisfiedLinkError) {
+
+            Log.e(
+                "RAKSHAK_DEBUG",
+                "UnsatisfiedLinkError: Native JNA library not found. Ensure jna-android dependency is properly configured.",
+                e
+            )
+
+            cleanup()
+
+            false
+
         } catch (e: Exception) {
 
             Log.e(
@@ -82,24 +94,32 @@ class VoskTranscriber(
                 e
             )
 
-            try {
-
-                recognizer?.close()
-            } catch (_: Exception) {
-            }
-
-            try {
-
-                model?.close()
-            } catch (_: Exception) {
-            }
-
-            recognizer = null
-
-            model = null
+            cleanup()
 
             false
         }
+    }
+
+    // ==========================================
+    // CLEANUP HELPER
+    // ==========================================
+    private fun cleanup() {
+
+        try {
+
+            recognizer?.close()
+        } catch (_: Exception) {
+        }
+
+        try {
+
+            model?.close()
+        } catch (_: Exception) {
+        }
+
+        recognizer = null
+
+        model = null
     }
 
     // ==========================================

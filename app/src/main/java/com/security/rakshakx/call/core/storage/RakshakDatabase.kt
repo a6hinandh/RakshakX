@@ -14,7 +14,7 @@ import com.security.rakshakx.data.entities.*
         WebEventEntity::class,
         ThreatSessionEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class RakshakDatabase : RoomDatabase() {

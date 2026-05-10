@@ -107,12 +107,6 @@ class CallRecordingService : Service() {
     private lateinit var recorder:
             CallAudioRecorder
 
-    private lateinit var voskTranscriber:
-            VoskTranscriber
-
-    @Volatile
-    private var voskReady = false
-
     private lateinit var classifier:
             FraudIntentClassifier
 
@@ -152,11 +146,6 @@ class CallRecordingService : Service() {
             "RAKSHAK_DEBUG",
             "CallAudioRecorder initialized"
         )
-
-        voskTranscriber =
-            VoskTranscriber(this)
-
-        voskReady = false
 
         classifier =
             FraudIntentClassifier()
@@ -284,49 +273,10 @@ class CallRecordingService : Service() {
                     "RECORD_AUDIO granted"
                 )
 
-                Log.d(
-                    "RAKSHAK_DEBUG",
-                    "Initializing Vosk before audio capture"
-                )
 
-                voskReady =
-                    try {
-
-                        voskTranscriber.initialize()
-                    } catch (e: Exception) {
-
-                        Log.e(
-                            "RAKSHAK_DEBUG",
-                            "Vosk initialize threw",
-                            e
-                        )
-
-                        false
-                    }
-
-                Log.d(
-                    "RAKSHAK_DEBUG",
-                    "Vosk init success = $voskReady"
-                )
-
-                if (!voskReady) {
-
-                    Log.e(
-                        "RAKSHAK_DEBUG",
-                        "Vosk not ready; stopping service"
-                    )
-
-                    broadcastCaptureStatus(
-                        "Capture: Vosk init failed"
-                    )
-
-                    stopSelf()
-
-                    return@launch
-                }
 
                 broadcastCaptureStatus(
-                    "Capture: Vosk Streaming Active"
+                    "Capture: Listening..."
                 )
 
                 broadcastCaptureSource(
@@ -352,47 +302,8 @@ class CallRecordingService : Service() {
                             length: Int
                         ) {
 
-                            try {
-
-                                // Vosk is initialized before PCM starts; guard defensively.
-                                if (!voskReady) {
-
-                                    return
-                                }
-
-                                // ==========================
-                                // PROCESS AUDIO
-                                // ==========================
-                                val transcript =
-                                    voskTranscriber.processAudio(
-                                        data,
-                                        length
-                                    )
-
-                                // ==========================
-                                // EMPTY RESULT
-                                // ==========================
-                                if (transcript.isBlank()) {
-
-                                    return
-                                }
-
-                                // ==========================
-                                // SUCCESS LOG
-                                // ==========================
-                                Log.d(
-                                    "RAKSHAK_DEBUG",
-                                    "TRANSCRIPT SUCCESS = $transcript"
-                                )
-
-                            } catch (e: Exception) {
-
-                                Log.e(
-                                    "RAKSHAK_DEBUG",
-                                    "Audio callback failed",
-                                    e
-                                )
-                            }
+                            // Audio chunk callback (reserved for future ASR routing)
+                            // Currently handled in main loop via getPcmData()
                         }
                     }
                 )
@@ -417,10 +328,7 @@ class CallRecordingService : Service() {
                     return@launch
                 }
 
-                Log.d(
-                    "RAKSHAK_DEBUG",
-                    "Realtime Vosk streaming active"
-                )
+
 
             } catch (e: Exception) {
 
@@ -640,10 +548,6 @@ class CallRecordingService : Service() {
         )
 
         recorder.release()
-
-        voskTranscriber.release()
-
-        voskReady = false
 
         scope.cancel()
     }

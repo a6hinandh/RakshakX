@@ -22,6 +22,8 @@ navigation = "2.9.0"
 compose-animation = "1.8.2"
 camerax = "1.4.1"
 mlkit-barcode = "17.3.0"
+vosk = "0.3.38"
+jna = "5.13.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -62,6 +64,8 @@ androidx-camera-view = { group = "androidx.camera", name = "camera-view", versio
 
 # ML Kit Barcode Scanning
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkit-barcode" }
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

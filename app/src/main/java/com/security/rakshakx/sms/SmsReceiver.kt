@@ -46,9 +46,44 @@ class SmsReceiver : BroadcastReceiver() {
                         continue
                     }
 
-                    // ── Hybrid ML Engine Analysis ─────────────────────────────
-                    // This handles scoring and notifications via ScamAlertManager
-                    detector.analyze(sender, body)
+                    // ── New ML Detection Pipeline ────────────────────────────
+                    val result = detector.analyze(sender, body)
+
+                    Log.d(
+                        TAG,
+                        "From=$sender isScam=${result.isScam} confidence=${result.confidence}"
+                    )
+
+                    // ── Fraud Notification ───────────────────────────────────
+                    if (result.isScam) {
+                        val score0to100 = result.ruleScore.takeIf { it > 0 }
+                            ?: (result.finalScore * 100f).toInt().coerceIn(0, 100)
+                        SmsFraudNotifications.showFraudAlert(
+                            context   = context,
+                            sender    = sender,
+                            message   = body,
+                            riskScore = score0to100,
+                            source    = "SMS"
+                        )
+                    }
+
+                    // ── Log to Database for Correlation ──────────────────────
+                    try {
+                        val db = com.security.rakshakx.call.core.storage.DatabaseFactory.getInstance(context)
+                        val urls = extractUrls(body)
+                        val entity = com.security.rakshakx.data.entities.SmsEventEntity(
+                            sender = sender,
+                            messageBody = body,
+                            fraudRiskScore = result.finalScore,
+                            detectedUrls = urls.joinToString(","),
+                            containsOtp = body.lowercase().contains("otp"),
+                            detectedKeywords = result.label
+                        )
+                        db.fraudDao().insertSms(entity)
+                        Log.d(TAG, "Logged SMS to DB for correlation: ${entity.sender}")
+                    } catch (dbError: Exception) {
+                        Log.e(TAG, "Failed to log SMS to DB", dbError)
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in SmsReceiver", e)
@@ -57,4 +92,14 @@ class SmsReceiver : BroadcastReceiver() {
             }
         }
     }
+
+    private fun extractUrls(text: String): List<String> {
+        val urls = mutableListOf<String>()
+        val matcher = android.util.Patterns.WEB_URL.matcher(text)
+        while (matcher.find()) {
+            urls.add(matcher.group())
+        }
+        return urls
+    }
 }
+

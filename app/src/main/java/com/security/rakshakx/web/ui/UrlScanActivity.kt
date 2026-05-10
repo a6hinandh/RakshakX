@@ -27,16 +27,26 @@ import com.security.rakshakx.web.storage.ThreatEntity
 import com.security.rakshakx.notifications.vpn.VpnProtectionNotifier
 import kotlinx.coroutines.launch
 import java.net.URL
+import com.security.rakshakx.core.correlation.MultiChannelCorrelationEngine
+import com.security.rakshakx.core.correlation.CorrelationResult
+import com.security.rakshakx.core.utils.HapticFeedbackManager
+import com.security.rakshakx.data.entities.WebEventEntity
+import com.security.rakshakx.call.core.storage.DatabaseFactory
+import androidx.compose.material.icons.filled.Warning
 
 class UrlScanActivity : ComponentActivity() {
 
     private lateinit var analyzer: DomainRiskAnalyzer
+    private lateinit var correlationEngine: MultiChannelCorrelationEngine
+    private lateinit var hapticManager: HapticFeedbackManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val intelRepo = ThreatIntelRepository(applicationContext)
         analyzer = DomainRiskAnalyzer(intelRepo)
+        correlationEngine = MultiChannelCorrelationEngine(applicationContext)
+        hapticManager = HapticFeedbackManager(applicationContext)
 
         var urlToScan = ""
         
@@ -47,6 +57,8 @@ class UrlScanActivity : ComponentActivity() {
         } else if (intent.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
             urlToScan = extractUrl(text)
+        } else if (intent.hasExtra("URL_TO_SCAN")) {
+            urlToScan = intent.getStringExtra("URL_TO_SCAN") ?: ""
         } else if (intent.hasExtra("EXTRA_URL")) {
             urlToScan = intent.getStringExtra("EXTRA_URL") ?: ""
         }
@@ -87,22 +99,38 @@ class UrlScanActivity : ComponentActivity() {
                         dnsFlags = emptyList(),
                         url = url
                     )
-                    assessment = result
+                    
+                    var finalAssessment = result
+                    
+                    // ── Multi-Channel Correlation ────────────────────────────
+                    val correlation = correlationEngine.correlateUrlWithRecentSms(url)
+                    
+                    if (correlation != null) {
+                        Log.i("UrlScanActivity", "Correlation found: ${correlation.reason}")
+                        hapticManager.triggerStrongWarning()
+                        // Force critical status if correlated
+                        finalAssessment = result.copy(
+                            level = ThreatLevel.CRITICAL,
+                            reasons = result.reasons + "Linked to suspicious SMS: ${correlation.sourceSms.sender}"
+                        )
+                    }
+                    
+                    assessment = finalAssessment
                     
                     // Log to database if HIGH or CRITICAL
-                    if (result.level == ThreatLevel.HIGH || result.level == ThreatLevel.CRITICAL) {
+                    if (finalAssessment.level == ThreatLevel.HIGH || finalAssessment.level == ThreatLevel.CRITICAL) {
                         val entity = ThreatEntity(
-                            timestamp = result.timestamp,
-                            domain = result.domain,
-                            level = result.level.name,
-                            action = result.action.name,
-                            reasons = result.reasons.joinToString(", "),
-                            fraudScore = 0, // Calculate appropriate score if needed
-                            fraudCategory = "Phishing URL",
+                            timestamp = finalAssessment.timestamp,
+                            domain = finalAssessment.domain,
+                            level = finalAssessment.level.name,
+                            action = finalAssessment.action.name,
+                            reasons = finalAssessment.reasons.joinToString(", "),
+                            fraudScore = if (correlation != null) 95 else 75,
+                            fraudCategory = if (correlation != null) "Coordinated Smishing" else "Phishing URL",
                             recommendedAction = "Do not visit",
-                            blockReason = "Manual scan detection",
+                            blockReason = if (correlation != null) "Multi-channel correlation detected" else "Manual scan detection",
                             visibleSignals = "",
-                            correlationData = "",
+                            correlationData = correlation?.reason ?: "",
                             browserPackage = "Manual Scan",
                             url = url,
                             destinationIp = "",
@@ -112,8 +140,24 @@ class UrlScanActivity : ComponentActivity() {
                         
                         val notifier = VpnProtectionNotifier(applicationContext)
                         notifier.createChannel()
-                        val reasons = result.reasons.joinToString("\n• ")
+                        val reasons = finalAssessment.reasons.joinToString("\n• ")
                         notifier.notifyThreat("RakshakX Threat Blocked", "URL: $url\nReasons:\n• $reasons")
+
+                        // ── Unified Logging to RakshakDatabase ───────────────
+                        val unifiedWebEvent = WebEventEntity(
+                            url = url,
+                            domain = finalAssessment.domain,
+                            pageTitle = "Manual Scan",
+                            fraudRiskScore = if (correlation != null) 0.95f else (finalAssessment.level.ordinal.toFloat() / 3f),
+                            phishingIndicators = finalAssessment.reasons.joinToString(","),
+                            sourceType = "WEB"
+                        )
+                        val webId = DatabaseFactory.getInstance(applicationContext).fraudDao().insertWeb(unifiedWebEvent)
+
+                        // ── Persist to Correlation Session if linked ──────────
+                        if (correlation != null) {
+                            correlationEngine.createCorrelatedSession(unifiedWebEvent.copy(id = webId), correlation)
+                        }
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -169,13 +213,33 @@ class UrlScanActivity : ComponentActivity() {
                             }
                             
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = color.copy(alpha = 0.1f)),
-                                modifier = Modifier.fillMaxWidth()
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (result.reasons.any { it.contains("Linked to suspicious SMS") })
+                                        Color(0xFFB71C1C) // Deep Red for coordinated
+                                    else color.copy(alpha = 0.1f)
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                border = if (result.reasons.any { it.contains("Linked to suspicious SMS") })
+                                    androidx.compose.foundation.BorderStroke(2.dp, Color.White.copy(alpha = 0.5f))
+                                else null
                             ) {
                                 Column(modifier = Modifier.padding(16.dp)) {
+                                    if (result.reasons.any { it.contains("Linked to suspicious SMS") }) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Filled.Warning, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                "COORDINATED ATTACK",
+                                                color = Color.White,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
                                     Text(
                                         "Level: ${result.level.name}",
-                                        color = color,
+                                        color = if (result.reasons.any { it.contains("Linked to suspicious SMS") }) Color.White else color,
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.ExtraBold
                                     )

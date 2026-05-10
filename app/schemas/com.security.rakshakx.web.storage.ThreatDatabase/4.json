@@ -1,0 +1,265 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "fb23882f2d4c74acbbc4c2f84c8b9598",
+    "entities": [
+      {
+        "tableName": "threats",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `domain` TEXT NOT NULL, `level` TEXT NOT NULL, `action` TEXT NOT NULL, `reasons` TEXT NOT NULL, `fraudScore` INTEGER NOT NULL, `fraudCategory` TEXT NOT NULL, `recommendedAction` TEXT NOT NULL, `blockReason` TEXT NOT NULL, `visibleSignals` TEXT NOT NULL, `correlationData` TEXT NOT NULL, `browserPackage` TEXT NOT NULL, `url` TEXT NOT NULL, `destinationIp` TEXT NOT NULL, `sniHost` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "domain",
+            "columnName": "domain",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "level",
+            "columnName": "level",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "action",
+            "columnName": "action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reasons",
+            "columnName": "reasons",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fraudScore",
+            "columnName": "fraudScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fraudCategory",
+            "columnName": "fraudCategory",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recommendedAction",
+            "columnName": "recommendedAction",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "blockReason",
+            "columnName": "blockReason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visibleSignals",
+            "columnName": "visibleSignals",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correlationData",
+            "columnName": "correlationData",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "browserPackage",
+            "columnName": "browserPackage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationIp",
+            "columnName": "destinationIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sniHost",
+            "columnName": "sniHost",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "browser_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `browserPackage` TEXT NOT NULL, `url` TEXT NOT NULL, `pageTitle` TEXT NOT NULL, `visibleText` TEXT NOT NULL, `passwordFieldDetected` INTEGER NOT NULL, `otpFieldDetected` INTEGER NOT NULL, `emailFieldDetected` INTEGER NOT NULL, `paymentFieldDetected` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "browserPackage",
+            "columnName": "browserPackage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageTitle",
+            "columnName": "pageTitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "visibleText",
+            "columnName": "visibleText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "passwordFieldDetected",
+            "columnName": "passwordFieldDetected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "otpFieldDetected",
+            "columnName": "otpFieldDetected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "emailFieldDetected",
+            "columnName": "emailFieldDetected",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paymentFieldDetected",
+            "columnName": "paymentFieldDetected",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "vpn_traffic",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `protocol` TEXT NOT NULL, `sourceIp` TEXT NOT NULL, `destinationIp` TEXT NOT NULL, `sourcePort` INTEGER NOT NULL, `destinationPort` INTEGER NOT NULL, `dnsQuery` TEXT NOT NULL, `sniHost` TEXT NOT NULL, `redirectChain` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "protocol",
+            "columnName": "protocol",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceIp",
+            "columnName": "sourceIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationIp",
+            "columnName": "destinationIp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourcePort",
+            "columnName": "sourcePort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "destinationPort",
+            "columnName": "destinationPort",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dnsQuery",
+            "columnName": "dnsQuery",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sniHost",
+            "columnName": "sniHost",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "redirectChain",
+            "columnName": "redirectChain",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fb23882f2d4c74acbbc4c2f84c8b9598')"
+    ]
+  }
+}

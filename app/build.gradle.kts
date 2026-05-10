@@ -73,18 +73,6 @@ android {
 dependencies {
 
     // ==========================================
-    // VOSK OFFLINE ASR
-    // ==========================================
-    implementation(
-        "com.alphacephei:vosk-android:0.3.32"
-    )
-
-    // IMPORTANT FIX FOR PointerType ERROR
-    implementation(
-        "net.java.dev.jna:jna:5.13.0"
-    )
-
-    // ==========================================
     // Compose
     // ==========================================
     implementation(
@@ -212,6 +200,12 @@ dependencies {
 
     implementation(
         libs.onnxruntime.android
+    )
+    implementation(
+        libs.vosk.android
+    )
+    implementation(
+        libs.jna
     )
 
     // ==========================================

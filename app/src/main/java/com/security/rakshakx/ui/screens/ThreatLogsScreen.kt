@@ -67,16 +67,35 @@ fun ThreatLogsScreen() {
             Spacer(modifier = Modifier.height(24.dp))
 
             // Header
-            Text(
-                "Verified Threats",
-                style = MaterialTheme.typography.headlineLarge,
-                color = Color.White
-            )
-            Text(
-                "${threats.size} events across all channels",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.6f)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Verified Threats",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.White
+                    )
+                    Text(
+                        "${threats.size} events across all channels",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        isLoading = true
+                        scope.launch(Dispatchers.IO) {
+                            threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
+                            isLoading = false
+                        }
+                    }
+                ) {
+                    Icon(Icons.Filled.Refresh, "Refresh", tint = Color.White)
+                }
+            }
 
         Spacer(modifier = Modifier.height(16.dp))
 

@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.graphics.PixelFormat
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -197,7 +198,17 @@ class OverlayBubbleService : Service() {
             .setSmallIcon(R.drawable.ic_recording)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID, 
+                notification,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                else 0
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         showOverlay()
 

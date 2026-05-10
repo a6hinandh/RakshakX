@@ -12,6 +12,12 @@ interface FraudDao {
 
     @Query("SELECT * FROM sms_events ORDER BY timestamp DESC")
     fun getAllSms(): Flow<List<SmsEventEntity>>
+    
+    @Query("SELECT * FROM sms_events ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getAllSmsList(limit: Int): List<SmsEventEntity>
+    
+    @Query("SELECT * FROM sms_events WHERE detectedUrls LIKE '%' || :url || '%' AND timestamp > :since ORDER BY timestamp DESC")
+    suspend fun findRecentSmsWithUrl(url: String, since: Long): List<SmsEventEntity>
 
     // CALL
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -34,12 +40,18 @@ interface FraudDao {
     @Query("SELECT * FROM web_events ORDER BY timestamp DESC")
     fun getAllWebEvents(): Flow<List<WebEventEntity>>
 
+    @Query("SELECT * FROM web_events ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getAllWebList(limit: Int): List<WebEventEntity>
+
     // THREAT SESSIONS
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertThreatSession(session: ThreatSessionEntity): Long
 
     @Query("SELECT * FROM threat_sessions WHERE resolved = 0 ORDER BY createdAt DESC")
     fun getActiveThreatSessions(): Flow<List<ThreatSessionEntity>>
+
+    @Query("SELECT * FROM threat_sessions ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun getRecentSessionsList(limit: Int): List<ThreatSessionEntity>
 
     @Query("DELETE FROM sms_events WHERE timestamp < :threshold")
     suspend fun pruneOldSms(threshold: Long)

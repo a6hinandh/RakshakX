@@ -91,7 +91,7 @@ interface VpnTrafficDao {
     suspend fun recent(limit: Int): List<VpnTrafficEntity>
 }
 
-@Database(entities = [ThreatEntity::class, BrowserSessionEntity::class, VpnTrafficEntity::class], version = 3)
+@Database(entities = [ThreatEntity::class, BrowserSessionEntity::class, VpnTrafficEntity::class], version = 4)
 abstract class ThreatDatabase : RoomDatabase() {
     abstract fun threatDao(): ThreatDao
     abstract fun browserSessionDao(): BrowserSessionDao
@@ -115,6 +115,7 @@ abstract class ThreatDatabase : RoomDatabase() {
             return Room.databaseBuilder(context, ThreatDatabase::class.java, "rakshakx_threats.db")
                 .openHelperFactory(factory)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .fallbackToDestructiveMigration()
                 .build()
         }
 

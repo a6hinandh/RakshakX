@@ -1,11 +1,13 @@
 package com.security.rakshakx.call.services.foreground
 
+import android.content.pm.ServiceInfo
 import android.app.NotificationManager
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -30,10 +32,20 @@ class FraudMonitoringForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannels(this)
-        startForeground(
-            MONITORING_NOTIFICATION_ID,
-            buildMonitoringNotification()
-        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                MONITORING_NOTIFICATION_ID,
+                buildMonitoringNotification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                else 0
+            )
+        } else {
+            startForeground(
+                MONITORING_NOTIFICATION_ID,
+                buildMonitoringNotification()
+            )
+        }
         serviceScope.launch {
             runCatching { getOrchestrator(applicationContext).start() }
         }
@@ -42,7 +54,17 @@ class FraudMonitoringForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(MONITORING_NOTIFICATION_ID, buildMonitoringNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                MONITORING_NOTIFICATION_ID,
+                buildMonitoringNotification(),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                else 0
+            )
+        } else {
+            startForeground(MONITORING_NOTIFICATION_ID, buildMonitoringNotification())
+        }
         return START_STICKY
     }
 

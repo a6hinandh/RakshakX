@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -137,7 +138,12 @@
         <!-- Foreground fraud monitoring -->
         <service
             android:name=".call.services.foreground.FraudMonitoringForegroundService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
+                android:value="Background orchestration of scam detection engines across multiple communication channels." />
+        </service>
 
         <!-- Call recording -->
         <service
@@ -149,12 +155,17 @@
         <service
             android:name=".call.callanalysis.OverlayBubbleService"
             android:exported="false"
-            android:foregroundServiceType="specialUse" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
+                android:value="Overlay for real-time fraud analysis during active calls. Requires visibility to provide user controls." />
+        </service>
 
         <!-- Hackathon mode -->
         <service
             android:name=".call.callanalysis.HackathonModeCallMonitorService"
-            android:exported="false" />
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|microphone" />
 
         <!-- Unified notification listener -->
         <service

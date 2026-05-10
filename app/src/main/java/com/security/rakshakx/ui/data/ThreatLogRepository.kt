@@ -78,35 +78,61 @@ object ThreatLogRepository {
             }
         } catch (_: Exception) { /* DB not initialized yet */ }
 
-        // ── Call/SMS orchestrator risk scores ──
+        // ── SMS threats (Individual Events) ──
         try {
             val rakshakDb = DatabaseFactory.getInstance(context)
-            val riskScores = rakshakDb.riskScoreDao().getTopRiskContacts(50)
-            riskScores.filter { it.riskScore >= 0.3f }.forEach { r ->
-                val channel = if (r.lastEventType == "SMS") Channel.SMS else Channel.CALL
+            val smsEvents = rakshakDb.fraudDao().getAllSmsList(50)
+            smsEvents.forEach { s ->
                 results.add(
                     ThreatLogEntry(
-                        id = "risk_${r.phoneNumber}_${r.updatedAt}",
-                        channel = channel,
+                        id = "sms_${s.id}",
+                        channel = Channel.SMS,
                         severity = when {
-                            r.riskScore >= 0.7f -> Severity.CRITICAL
-                            r.riskScore >= 0.5f -> Severity.HIGH
-                            r.riskScore >= 0.3f -> Severity.MEDIUM
+                            s.fraudRiskScore >= 0.7f -> Severity.CRITICAL
+                            s.fraudRiskScore >= 0.5f -> Severity.HIGH
+                            s.fraudRiskScore >= 0.3f -> Severity.MEDIUM
                             else -> Severity.LOW
                         },
-                        title = "Risk Event (${r.lastEventType})",
-                        description = r.lastMessageSnippet ?: "No details available",
-                        source = r.phoneNumber,
-                        riskScore = r.riskScore,
-                        timestamp = r.updatedAt,
+                        title = if (s.fraudRiskScore >= 0.5f) "Scam SMS Detected" else "Suspicious SMS",
+                        description = s.messageBody,
+                        source = s.sender,
+                        riskScore = s.fraudRiskScore,
+                        timestamp = s.timestamp,
                         indicators = buildList {
-                            if (r.lastMessageSnippet?.lowercase()?.contains("otp") == true) add("OTP request")
-                            if (r.lastMessageSnippet?.lowercase()?.contains("bank") == true) add("Bank impersonation")
+                            if (s.containsOtp) add("OTP Request")
+                            if (s.detectedKeywords.isNotBlank()) add(s.detectedKeywords)
                         }
                     )
                 )
             }
-        } catch (_: Exception) { /* DB not initialized yet */ }
+        } catch (_: Exception) { }
+
+        // ── Web threats (Web Module Database) ──
+        try {
+            val webModuleDb = com.security.rakshakx.web.storage.ThreatDatabase.getInstance(context)
+            val webThreats = webModuleDb.threatDao().recent(50)
+            webThreats.forEach { w ->
+                results.add(
+                    ThreatLogEntry(
+                        id = "web_mod_${w.id}",
+                        channel = Channel.WEB,
+                        severity = when (w.level) {
+                            "CRITICAL" -> Severity.CRITICAL
+                            "HIGH" -> Severity.HIGH
+                            "MEDIUM" -> Severity.MEDIUM
+                            else -> Severity.LOW
+                        },
+                        title = w.fraudCategory.ifBlank { "Phishing URL Intercepted" },
+                        description = w.url,
+                        source = w.domain,
+                        riskScore = w.fraudScore / 100f,
+                        timestamp = w.timestamp,
+                        indicators = w.reasons.split(",").filter { it.isNotBlank() },
+                        reason = w.blockReason
+                    )
+                )
+            }
+        } catch (_: Exception) { }
 
         return results.sortedByDescending { it.timestamp }
     }

@@ -13,6 +13,7 @@ data class SmsEventEntity(
     val otpCode: String? = null,
     val fraudRiskScore: Float = 0f,
     val detectedKeywords: String = "",
+    val detectedUrls: String = "",
     val sourceType: String = "SMS"
 )
 
@@ -64,6 +65,7 @@ data class ThreatSessionEntity(
     val linkedWebId: Long? = null,
     val overallThreatScore: Float = 0f,
     val threatCategory: String,
+    val correlationReason: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val resolved: Boolean = false,
     val recommendedAction: String
