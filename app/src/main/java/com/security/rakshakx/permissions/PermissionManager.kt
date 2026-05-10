@@ -62,6 +62,10 @@ object PermissionManager {
         }
     }
 
+    fun isDrawOverlaysEnabled(context: Context): Boolean {
+        return Settings.canDrawOverlays(context)
+    }
+
     fun isVpnPrepared(context: Context): Boolean {
         return VpnService.prepare(context) == null
     }
@@ -70,6 +74,7 @@ object PermissionManager {
         val corePermissionsGranted: Boolean,
         val notificationListenerEnabled: Boolean,
         val accessibilityEnabled: Boolean,
+        val overlayEnabled: Boolean,
         val smsReady: Boolean,
         val callReady: Boolean,
         val emailReady: Boolean,
@@ -82,6 +87,7 @@ object PermissionManager {
             corePermissionsGranted = hasCorePermissions(context),
             notificationListenerEnabled = isNotificationListenerEnabled(context),
             accessibilityEnabled = isAccessibilityEnabled(context),
+            overlayEnabled = isDrawOverlaysEnabled(context),
             receiveSmsGranted = hasPermission(context, Manifest.permission.RECEIVE_SMS),
             readSmsGranted = hasPermission(context, Manifest.permission.READ_SMS),
             readCallLogGranted = hasPermission(context, Manifest.permission.READ_CALL_LOG),
@@ -95,6 +101,7 @@ object PermissionManager {
         corePermissionsGranted: Boolean,
         notificationListenerEnabled: Boolean,
         accessibilityEnabled: Boolean,
+        overlayEnabled: Boolean,
         receiveSmsGranted: Boolean,
         readSmsGranted: Boolean,
         readCallLogGranted: Boolean,
@@ -103,7 +110,7 @@ object PermissionManager {
         postNotificationsGranted: Boolean
     ): ReadinessState {
         val smsReady = receiveSmsGranted && readSmsGranted && notificationListenerEnabled
-        val callReady = readCallLogGranted && readPhoneStateGranted && recordAudioGranted && postNotificationsGranted
+        val callReady = readCallLogGranted && readPhoneStateGranted && recordAudioGranted && postNotificationsGranted && overlayEnabled
         val emailReady = notificationListenerEnabled
         val webReady = accessibilityEnabled
 
@@ -111,11 +118,12 @@ object PermissionManager {
             corePermissionsGranted = corePermissionsGranted,
             notificationListenerEnabled = notificationListenerEnabled,
             accessibilityEnabled = accessibilityEnabled,
+            overlayEnabled = overlayEnabled,
             smsReady = smsReady,
             callReady = callReady,
             emailReady = emailReady,
             webReady = webReady,
-            minimumDashboardReady = corePermissionsGranted && notificationListenerEnabled && accessibilityEnabled
+            minimumDashboardReady = corePermissionsGranted && notificationListenerEnabled && accessibilityEnabled && overlayEnabled
         )
     }
 
@@ -125,6 +133,7 @@ object PermissionManager {
         if (!state.corePermissionsGranted) missing += "Core runtime permissions"
         if (!state.notificationListenerEnabled) missing += "Notification access"
         if (!state.accessibilityEnabled) missing += "Accessibility service"
+        if (!state.overlayEnabled) missing += "Appear on top permission"
         return missing
     }
 }

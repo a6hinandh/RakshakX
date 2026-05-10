@@ -47,6 +47,15 @@ interface FraudDao {
     @Query("DELETE FROM call_events WHERE timestamp < :threshold")
     suspend fun pruneOldCalls(threshold: Long)
 
+    @Query("DELETE FROM web_events WHERE timestamp < :threshold")
+    suspend fun pruneOldWebEvents(threshold: Long)
+
+    @Query("DELETE FROM email_events WHERE timestamp < :threshold")
+    suspend fun pruneOldEmails(threshold: Long)
+
+    @Query("DELETE FROM threat_sessions WHERE createdAt < :threshold")
+    suspend fun pruneOldSessions(threshold: Long)
+
     @Query("SELECT * FROM threat_sessions WHERE overallThreatScore > :minScore")
     fun getSuspiciousSessions(minScore: Float): Flow<List<ThreatSessionEntity>>
 }

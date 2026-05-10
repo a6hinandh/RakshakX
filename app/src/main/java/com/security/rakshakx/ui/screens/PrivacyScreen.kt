@@ -22,9 +22,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.security.rakshakx.ui.components.SectionHeader
+import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.theme.*
 import com.security.rakshakx.web.utils.VpnStatusStore
+import com.security.rakshakx.core.SettingsStore
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun PrivacyScreen() {
@@ -47,26 +49,36 @@ fun PrivacyScreen() {
         } catch (_: Exception) { false }
     }
 
-    Column(
+    val settingsStore = remember { SettingsStore.getInstance(context) }
+    val dataRetentionDays by settingsStore.autoDeleteDays.collectAsState(initial = 30)
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                )
+            )
     ) {
-        // Header
-        Text(
-            "Privacy & Security",
-            style = MaterialTheme.typography.headlineMedium,
-            color = colors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "Your data stays on your device",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textMuted
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header
+            Text(
+                "Privacy & Security",
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color.White
+            )
+            Text(
+                "Your data stays on your device",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f)
+            )
 
         // On-device processing card
         Card(
@@ -127,9 +139,9 @@ fun PrivacyScreen() {
         TransparencyItem(
             icon = Icons.Filled.AutoDelete,
             title = "Data Retention",
-            description = "Logs are auto-deleted after 30 days. Manual clear available below.",
-            statusColor = colors.warning,
-            statusText = "30 Days"
+            description = "Logs are auto-deleted after $dataRetentionDays days. Manual clear available below.",
+            statusColor = Color(0xFFF59E0B),
+            statusText = "$dataRetentionDays Days"
         )
 
         // Permission status
@@ -193,8 +205,9 @@ fun PrivacyScreen() {
             )
         }
 
-        Spacer(modifier = Modifier.height(80.dp))
+        RakshakXFooter()
     }
+}
 }
 
 @Composable

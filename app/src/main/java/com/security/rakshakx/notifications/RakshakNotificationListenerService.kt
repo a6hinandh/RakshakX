@@ -18,6 +18,7 @@ import com.security.rakshakx.sms.SmsScamDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import com.security.rakshakx.core.SettingsStore
 
 /**
  * Single [NotificationListenerService] for SMS + email ingress (Android allows one active listener per app).
@@ -127,12 +128,22 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         val body = bigText.ifBlank { text }
         if (body.isBlank()) return
 
+        val settings = SettingsStore.getInstance(this)
+
         when {
             isSmsAppPackage(pkg) -> {
+                if (!settings.smsEnabled.value) {
+                    Log.d(TAG, "SMS protection disabled. Ignoring.")
+                    return
+                }
                 if (title.contains("new messages", ignoreCase = true)) return
                 handleSmsNotification(pkg, title, body)
             }
             isEmailAppPackage(pkg) -> {
+                if (!settings.emailEnabled.value) {
+                    Log.d(TAG, "Email protection disabled. Ignoring.")
+                    return
+                }
                 val ingress = extractEmailIngress(extras, pkg, title, body)
                 handleEmailNotification(pkg, ingress)
             }

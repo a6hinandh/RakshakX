@@ -7,7 +7,11 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.security.rakshakx.ui.theme.Cyan400
+import com.security.rakshakx.ui.theme.PremiumBlue
+import com.security.rakshakx.ui.theme.PremiumGreen
+import com.security.rakshakx.ui.theme.PremiumOrange
+import com.security.rakshakx.ui.theme.PremiumPurple
+import com.security.rakshakx.ui.theme.PremiumRed
 import com.security.rakshakx.ui.theme.GreenSafe
 import com.security.rakshakx.ui.theme.OrangeWarn
 import com.security.rakshakx.ui.theme.RedCritical
@@ -18,10 +22,10 @@ enum class Channel(
     val icon: ImageVector,
     val color: Color
 ) {
-    SMS("SMS", Icons.Filled.Sms, Cyan400),
-    CALL("Call", Icons.Filled.Call, OrangeWarn),
-    WEB("Web", Icons.Filled.Language, GreenSafe),
-    EMAIL("Email", Icons.Filled.Email, RedCritical);
+    SMS("SMS", Icons.Filled.Sms, PremiumBlue),
+    CALL("Call", Icons.Filled.Call, PremiumPurple),
+    WEB("Web", Icons.Filled.Language, PremiumGreen),
+    EMAIL("Email", Icons.Filled.Email, PremiumRed);
 }
 
 /** Severity level for threat events */

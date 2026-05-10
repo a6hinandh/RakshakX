@@ -6,6 +6,8 @@ import android.content.Intent
 import android.telephony.TelephonyManager
 import android.util.Log
 
+import com.security.rakshakx.core.SettingsStore
+
 class CallStateReceiver : BroadcastReceiver() {
 
     companion object {
@@ -13,6 +15,11 @@ class CallStateReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        val settings = SettingsStore.getInstance(context)
+        if (!settings.callEnabled.value) {
+            Log.d(TAG, "Call protection disabled. Ignoring.")
+            return
+        }
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
         val phoneNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
 

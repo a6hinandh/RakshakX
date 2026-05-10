@@ -22,6 +22,9 @@ interface RiskScoreDao {
 
     @Query("SELECT * FROM risk_scores ORDER BY updatedAt DESC")
     fun streamAll(): Flow<List<RiskScoreEntity>>
+
+    @Query("DELETE FROM risk_scores WHERE updatedAt < :timestamp")
+    suspend fun deleteOldScores(timestamp: Long)
 }
 
 

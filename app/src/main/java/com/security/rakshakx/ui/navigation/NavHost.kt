@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -34,6 +35,7 @@ sealed class Screen(val route: String, val label: String, val filledIcon: ImageV
     // Non-tab destinations
     data object LiveThreat : Screen("live_threat", "Live", Icons.Filled.RadioButtonChecked, Icons.Outlined.RadioButtonChecked)
     data object Settings : Screen("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
+    data object Scanning : Screen("scanning", "Scanning", Icons.Filled.QrCodeScanner, Icons.Outlined.QrCodeScanner)
 }
 
 val bottomNavItems = listOf(Screen.Home, Screen.Threats, Screen.Correlation, Screen.Privacy)
@@ -82,6 +84,11 @@ fun RakshakXNavHost(
                         navController.navigate(Screen.Settings.route) {
                             launchSingleTop = true
                         }
+                    },
+                    onNavigateToScanning = {
+                        navController.navigate(Screen.Scanning.route) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -95,10 +102,13 @@ fun RakshakXNavHost(
                 PrivacyScreen()
             }
             composable(Screen.LiveThreat.route) {
-                LiveThreatScreen()
+                LiveThreatScreen(onBack = { navController.popBackStack() })
             }
             composable(Screen.Settings.route) {
-                SettingsScreen(activity = activity)
+                SettingsScreen(activity = activity, onBack = { navController.popBackStack() })
+            }
+            composable(Screen.Scanning.route) {
+                ScanningScreen(activity = activity, onBack = { navController.popBackStack() })
             }
         }
     }
@@ -112,14 +122,13 @@ private fun RakshakXBottomBar(navController: NavHostController) {
 
     // Only show bottom bar on main tabs
     val currentRoute = currentDestination?.route
-    if (currentRoute == Screen.Settings.route || currentRoute == Screen.LiveThreat.route) return
+    if (currentRoute == Screen.Settings.route || currentRoute == Screen.LiveThreat.route || currentRoute == Screen.Scanning.route) return
 
     NavigationBar(
-        modifier = Modifier
-            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
-        containerColor = colors.cardBackground,
-        contentColor = colors.textPrimary,
-        tonalElevation = 0.dp,
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = Color(0xFF1E293B), // Match the card background
+        contentColor = Color.White,
+        tonalElevation = 8.dp,
     ) {
         bottomNavItems.forEach { screen ->
             val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true

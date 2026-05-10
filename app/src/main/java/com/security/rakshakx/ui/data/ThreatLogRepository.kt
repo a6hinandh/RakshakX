@@ -112,6 +112,38 @@ object ThreatLogRepository {
     }
 
     /**
+     * Delete logs older than [days] from all underlying databases.
+     */
+    suspend fun cleanOldLogs(context: Context, days: Int) {
+        val threshold = System.currentTimeMillis() - (days.toLong() * 24 * 60 * 60 * 1000)
+        
+        // Email
+        try {
+            EmailThreatDb.getDatabase(context).threatDao().deleteOldThreats(threshold)
+        } catch (_: Exception) {}
+
+        // Calls (CallDatabase)
+        try {
+            CallDatabase.getInstance(context).callDao().deleteOldCalls(threshold)
+        } catch (_: Exception) {}
+
+        // Risk Scores (DatabaseFactory)
+        try {
+            DatabaseFactory.getInstance(context).riskScoreDao().deleteOldScores(threshold)
+        } catch (_: Exception) {}
+
+        // Orchestrator Logs (FraudDao)
+        try {
+            val fraudDao = DatabaseFactory.getInstance(context).fraudDao()
+            fraudDao.pruneOldSms(threshold)
+            fraudDao.pruneOldCalls(threshold)
+            fraudDao.pruneOldWebEvents(threshold)
+            fraudDao.pruneOldEmails(threshold)
+            fraudDao.pruneOldSessions(threshold)
+        } catch (_: Exception) {}
+    }
+
+    /**
      * Pre-built demo scenario showing a multi-stage scam attack
      * across all four channels for hackathon demonstration.
      */

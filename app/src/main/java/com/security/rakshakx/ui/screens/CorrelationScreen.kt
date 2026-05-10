@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,26 +63,32 @@ fun CorrelationScreen() {
 
     val events = if (showDemo) ThreatLogRepository.getDemoCorrelationTimeline() else realEvents
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                )
+            )
     ) {
-        // Header
         Column(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text(
-                "Fraud Correlation",
-                style = MaterialTheme.typography.headlineMedium,
-                color = colors.textPrimary,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Cross-channel attack timeline",
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textMuted
-            )
+            // Header
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
+            ) {
+                Text(
+                    "Security Timeline",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White
+                )
+                Text(
+                    "Cross-channel attack correlation",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -247,7 +254,10 @@ fun CorrelationScreen() {
                         isLast = index == events.lastIndex
                     )
                 }
+                
+                RakshakXFooter()
             }
+        }
         }
     }
 }

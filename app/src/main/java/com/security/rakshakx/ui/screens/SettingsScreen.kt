@@ -7,102 +7,106 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
-import com.security.rakshakx.email.pipeline.EmailThreatPipeline
-import com.security.rakshakx.permissions.PermissionManager
-import com.security.rakshakx.ui.components.SectionHeader
+import com.security.rakshakx.core.SettingsStore
+import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.theme.*
 import com.security.rakshakx.web.services.FraudVpnService
 import com.security.rakshakx.web.utils.VpnStatusStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 
 @Composable
-fun SettingsScreen(activity: Activity) {
-    val colors = LocalRakshakXColors.current
+fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val settingsStore = remember { SettingsStore.getInstance(context) }
 
-    val emailTestIoScope = remember {
-        CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    }
-    DisposableEffect(Unit) {
-        onDispose { emailTestIoScope.cancel() }
-    }
+    val smsEnabled by settingsStore.smsEnabled.collectAsState()
+    val callEnabled by settingsStore.callEnabled.collectAsState()
+    val emailEnabled by settingsStore.emailEnabled.collectAsState()
+    val sensitivity by settingsStore.sensitivity.collectAsState()
+    val autoDeleteDays by settingsStore.autoDeleteDays.collectAsState()
 
-    var showEmailTestDialog by remember { mutableStateOf(false) }
-    var emailTestTitle by remember { mutableStateOf(EmailThreatPipeline.presetPhishingSampleTitle()) }
-    var emailTestBody by remember { mutableStateOf(EmailThreatPipeline.presetPhishingSampleBody()) }
-    var lastScanSummary by remember { mutableStateOf<String?>(null) }
-
-    val notifPermLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* result handled on next pipeline run */ }
-
-    // Settings state
-    var sensitivity by remember { mutableStateOf(0.5f) }
-    var autoDeleteDays by remember { mutableStateOf(30) }
-    var smsEnabled by remember { mutableStateOf(true) }
-    var callEnabled by remember { mutableStateOf(true) }
-    var emailEnabled by remember { mutableStateOf(true) }
-    var seniorMode by remember { mutableStateOf(false) }
-
-    // Real VPN state
-    val webEnabled by VpnStatusStore.isRunning.collectAsState()
+    // Real VPN state for the toggle logic
+    val vpnRunning by VpnStatusStore.isRunning.collectAsState()
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             FraudVpnService.start(activity.applicationContext)
+            settingsStore.setWebEnabled(true)
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                )
+            )
     ) {
-        // Header
-        Text(
-            "Settings",
-            style = MaterialTheme.typography.headlineMedium,
-            color = colors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Header with back button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .padding(end = 12.dp)
+                        .background(Color.White.copy(alpha = 0.05f), androidx.compose.foundation.shape.CircleShape)
+                        .size(40.dp)
+                ) {
+                    Icon(Icons.Filled.ArrowBack, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+                Column {
+                    Text(
+                        "Settings",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Configure your protection preferences",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
 
         // ── Protection Sensitivity ──
         SectionHeader(title = "Protection Sensitivity")
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, colors.border, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Detection Threshold", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+                    Text("Detection Threshold", style = MaterialTheme.typography.titleSmall, color = Color.White)
                     Text(
                         when {
                             sensitivity >= 0.7f -> "Aggressive"
@@ -111,25 +115,25 @@ fun SettingsScreen(activity: Activity) {
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = when {
-                            sensitivity >= 0.7f -> colors.critical
-                            sensitivity >= 0.4f -> colors.warning
-                            else -> colors.safe
+                            sensitivity >= 0.7f -> Color(0xFFEF4444)
+                            sensitivity >= 0.4f -> Color(0xFFF59E0B)
+                            else -> Color(0xFF10B981)
                         }
                     )
                 }
                 Slider(
                     value = sensitivity,
-                    onValueChange = { sensitivity = it },
+                    onValueChange = { settingsStore.setSensitivity(it) },
                     colors = SliderDefaults.colors(
-                        thumbColor = colors.primary,
-                        activeTrackColor = colors.primary,
-                        inactiveTrackColor = colors.surfaceElevated
+                        thumbColor = Color(0xFF4776E6),
+                        activeTrackColor = Color(0xFF4776E6),
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
                     )
                 )
                 Text(
-                    "Higher sensitivity = more false positives but fewer missed threats",
+                    "Higher sensitivity = more proactive but may result in more warnings.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textMuted
+                    color = Color.White.copy(alpha = 0.5f)
                 )
             }
         }
@@ -139,203 +143,69 @@ fun SettingsScreen(activity: Activity) {
         SettingsToggle(
             icon = Icons.Filled.Sms,
             title = "SMS Shield",
-            description = "Monitor SMS notifications for fraud",
+            description = "Monitor SMS for pre-action fraud interception",
             isChecked = smsEnabled,
-            onCheckedChange = { smsEnabled = it },
-            iconColor = Cyan400
+            onCheckedChange = { settingsStore.setSmsEnabled(it) },
+            iconColor = Color(0xFF4776E6)
         )
         SettingsToggle(
             icon = Icons.Filled.Call,
             title = "Call Shield",
-            description = "Monitor incoming calls for scams",
+            description = "Intercept scams during live calls",
             isChecked = callEnabled,
-            onCheckedChange = { callEnabled = it },
-            iconColor = OrangeWarn
+            onCheckedChange = { settingsStore.setCallEnabled(it) },
+            iconColor = Color(0xFF8E54E9)
         )
         SettingsToggle(
             icon = Icons.Filled.Language,
             title = "Web Shield (VPN)",
-            description = "Intercepts web traffic to block phishing sites",
-            isChecked = webEnabled,
+            description = "Block phishing and malicious URLs",
+            isChecked = vpnRunning,
             onCheckedChange = { enable ->
                 if (enable) {
                     val intent = VpnService.prepare(activity)
                     if (intent != null) vpnLauncher.launch(intent)
-                    else FraudVpnService.start(activity.applicationContext)
+                    else {
+                        FraudVpnService.start(activity.applicationContext)
+                        settingsStore.setWebEnabled(true)
+                    }
                 } else {
                     FraudVpnService.stop(activity.applicationContext)
+                    settingsStore.setWebEnabled(false)
                 }
             },
-            iconColor = GreenSafe
+            iconColor = Color(0xFF10B981)
         )
         SettingsToggle(
             icon = Icons.Filled.Email,
             title = "Email Shield",
-            description = "Monitor email notifications for phishing",
+            description = "Scan mail notifications for phishing intent",
             isChecked = emailEnabled,
-            onCheckedChange = { emailEnabled = it },
-            iconColor = RedCritical
+            onCheckedChange = { settingsStore.setEmailEnabled(it) },
+            iconColor = Color(0xFFEF4444)
         )
-        OutlinedButton(
-            onClick = {
-                lastScanSummary = null
-                showEmailTestDialog = true
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)
-        ) {
-            Icon(Icons.Filled.Science, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Test email phishing scan")
-        }
-
-        if (showEmailTestDialog) {
-            AlertDialog(
-                onDismissRequest = { showEmailTestDialog = false },
-                title = { Text("Test email phishing scan", color = colors.textPrimary) },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Text(
-                            "Uses the same analysis as Gmail (and other mail) notifications. If the outcome is HIGH RISK, RakshakX posts a fraud alert notification.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textMuted
-                        )
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                            !PermissionManager.hasNotificationPermission(activity)
-                        ) {
-                            Text(
-                                "Notification permission is off — grant it to see HIGH RISK alerts.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.warning
-                            )
-                        }
-                        OutlinedTextField(
-                            value = emailTestTitle,
-                            onValueChange = { emailTestTitle = it },
-                            label = { Text("Subject") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = colors.textPrimary,
-                                unfocusedTextColor = colors.textPrimary
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences
-                            )
-                        )
-                        OutlinedTextField(
-                            value = emailTestBody,
-                            onValueChange = { emailTestBody = it },
-                            label = { Text("Message body") },
-                            minLines = 5,
-                            maxLines = 12,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = colors.textPrimary,
-                                unfocusedTextColor = colors.textPrimary
-                            ),
-                            keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardCapitalization.Sentences
-                            )
-                        )
-                        TextButton(
-                            onClick = {
-                                emailTestTitle = EmailThreatPipeline.presetPhishingSampleTitle()
-                                emailTestBody = EmailThreatPipeline.presetPhishingSampleBody()
-                            },
-                            modifier = Modifier.align(Alignment.Start)
-                        ) {
-                            Text("Load sample phishing text", color = colors.primary)
-                        }
-                        lastScanSummary?.let {
-                            Text(
-                                it,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.textSecondary
-                            )
-                        }
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showEmailTestDialog = false }) {
-                        Text("Close", color = colors.textMuted)
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                !PermissionManager.hasNotificationPermission(activity)
-                            ) {
-                                notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                            val ctx = activity.applicationContext
-                            val result = EmailThreatPipeline.process(
-                                context = ctx,
-                                title = emailTestTitle.trim().ifBlank { "(no subject)" },
-                                body = emailTestBody,
-                                persistenceScope = emailTestIoScope
-                            )
-                            val extras = buildString {
-                                append("${result.riskLevel} • score ${result.score}")
-                                if (result.reasons.isNotEmpty()) {
-                                    append("\n")
-                                    append(result.reasons.joinToString(" · "))
-                                }
-                                if (result.riskLevel == "HIGH RISK" &&
-                                    PermissionManager.hasNotificationPermission(activity)
-                                ) {
-                                    append("\nA HIGH RISK notification was sent.")
-                                } else if (result.riskLevel == "HIGH RISK") {
-                                    append("\nTurn on notifications to see the alert.")
-                                }
-                            }
-                            lastScanSummary = extras
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = colors.primary)
-                    ) {
-                        Text("Run scan")
-                    }
-                },
-                containerColor = colors.cardBackground,
-                tonalElevation = 4.dp
-            )
-        }
 
         // ── Auto-delete ──
         SectionHeader(title = "Data Retention")
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, colors.border, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Auto-delete threat logs after:", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text("Auto-delete threat logs after:", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(7, 14, 30, 90).forEach { days ->
                         FilterChip(
                             selected = autoDeleteDays == days,
-                            onClick = { autoDeleteDays = days },
+                            onClick = { settingsStore.setAutoDeleteDays(days) },
                             label = { Text("${days}d") },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                                selectedLabelColor = colors.primary,
-                                containerColor = colors.surfaceElevated,
-                                labelColor = colors.textSecondary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                borderColor = colors.border,
-                                selectedBorderColor = colors.primary.copy(alpha = 0.3f),
-                                enabled = true,
-                                selected = autoDeleteDays == days
+                                selectedContainerColor = Color(0xFF4776E6).copy(alpha = 0.2f),
+                                selectedLabelColor = Color(0xFF4776E6),
+                                containerColor = Color.White.copy(alpha = 0.05f),
+                                labelColor = Color.White.copy(alpha = 0.6f)
                             )
                         )
                     }
@@ -343,37 +213,41 @@ fun SettingsScreen(activity: Activity) {
             }
         }
 
-        // ── Special Modes ──
-        SectionHeader(title = "Special Modes")
-        SettingsToggle(
-            icon = Icons.Filled.Elderly,
-            title = "Senior Protection Mode",
-            description = "Enhanced protection with simplified warnings and auto-block for high-risk events",
-            isChecked = seniorMode,
-            onCheckedChange = { seniorMode = it },
-            iconColor = colors.primary
-        )
-
         // ── About ──
-        SectionHeader(title = "About")
+        SectionHeader(title = "About RakshakX")
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, colors.border, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("RakshakX", style = MaterialTheme.typography.titleMedium, color = colors.primary, fontWeight = FontWeight.Bold)
+                Text("RakshakX", style = MaterialTheme.typography.titleLarge, color = Color(0xFF4776E6), fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "RakshakX is a zero-configuration, privacy-first AI guardian that intercepts scams across calls, SMS, email, and web browsing. It leverages on-device AI and edge intelligence to analyze voice patterns, text intent, URLs, and behavioral signals in real time, enabling silent pre-action interception, cross-channel fraud correlation, and adaptive risk-based blocking or warnings—all without transmitting raw user data.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "Version 1.2.0 • On-Device Neural Engine",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text("Autonomous Privacy-First Fraud Interception Platform", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Version 1.0.0 • On-Device AI", style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
+                Text(
+                    "Developed by InnovateX",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color(0xFF8E54E9)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(80.dp))
+        RakshakXFooter()
     }
+}
 }
 
 @Composable
@@ -385,34 +259,38 @@ private fun SettingsToggle(
     onCheckedChange: (Boolean) -> Unit,
     iconColor: Color
 ) {
-    val colors = LocalRakshakXColors.current
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, colors.border, RoundedCornerShape(12.dp)),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFF1E293B),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(icon, null, tint = iconColor, modifier = Modifier.size(22.dp))
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(iconColor.copy(alpha = 0.1f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
+            }
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                Text(title, style = MaterialTheme.typography.titleSmall, color = Color.White)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.5f))
             }
             Switch(
                 checked = isChecked,
                 onCheckedChange = onCheckedChange,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = colors.primary,
-                    checkedTrackColor = colors.primary.copy(alpha = 0.2f),
-                    uncheckedThumbColor = colors.textMuted,
-                    uncheckedTrackColor = colors.surfaceElevated
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = iconColor,
+                    uncheckedThumbColor = Color.White.copy(alpha = 0.5f),
+                    uncheckedTrackColor = Color.White.copy(alpha = 0.1f)
                 )
             )
         }

@@ -30,7 +30,7 @@ import com.security.rakshakx.ui.data.*
 import com.security.rakshakx.ui.theme.*
 
 @Composable
-fun LiveThreatScreen() {
+fun LiveThreatScreen(onBack: () -> Unit) {
     val colors = LocalRakshakXColors.current
 
     // Simulated live analysis state
@@ -57,47 +57,69 @@ fun LiveThreatScreen() {
         ThreatIndicator("Suspicious URL", Icons.Filled.Link, detected = false),
     )
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                )
+            )
     ) {
-        // Header with live indicator
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column {
-                Text(
-                    "Live Detection",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = colors.textPrimary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    "Real-time threat analysis",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textMuted
-                )
-            }
-            // Live indicator dot
+            // Header with back button and live indicator
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .background(Color.White.copy(alpha = 0.05f), androidx.compose.foundation.shape.CircleShape)
+                            .size(36.dp)
+                    ) {
+                        Icon(Icons.Filled.ArrowBack, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                    Column {
+                        Text(
+                            "Live Intelligence",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Real-time telemetry",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }
+                // Live indicator dot
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(colors.safe.copy(alpha = pulse))
-                )
-                Text("LIVE", style = MaterialTheme.typography.labelSmall, color = colors.safe, fontWeight = FontWeight.Bold)
+                        .background(Color(0xFF10B981).copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF10B981).copy(alpha = pulse))
+                    )
+                    Text("LIVE", style = MaterialTheme.typography.labelSmall, color = Color(0xFF10B981), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                }
             }
-        }
 
         // Large Risk Gauge
         Box(
@@ -135,47 +157,56 @@ fun LiveThreatScreen() {
 
         // Threat Indicators Grid
         SectionHeader(title = "Threat Indicators")
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             indicators.chunked(2).forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     row.forEach { indicator ->
                         Card(
                             modifier = Modifier
-                                .weight(1f)
-                                .border(
-                                    1.dp,
-                                    if (indicator.detected) colors.critical.copy(alpha = 0.3f) else colors.border,
-                                    RoundedCornerShape(12.dp)
-                                ),
-                            shape = RoundedCornerShape(12.dp),
+                                .weight(1f),
+                            shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (indicator.detected) colors.criticalBg else colors.cardBackground
-                            )
+                                containerColor = if (indicator.detected) Color(0xFFEF4444).copy(alpha = 0.1f) else Color.White.copy(alpha = 0.05f)
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (indicator.detected) Color(0xFFEF4444).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f))
                         ) {
                             Row(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier.padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Icon(
-                                    indicator.icon,
-                                    null,
-                                    tint = if (indicator.detected) colors.critical else colors.textMuted,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Column {
+                                Box(
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            if (indicator.detected) Color(0xFFEF4444).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f),
+                                            RoundedCornerShape(10.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        indicator.icon,
+                                        null,
+                                        tint = if (indicator.detected) Color(0xFFEF4444) else Color.White.copy(alpha = 0.4f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         indicator.name,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = if (indicator.detected) colors.critical else colors.textSecondary
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (indicator.detected) Color(0xFFEF4444) else Color.White.copy(alpha = 0.6f),
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
                                     Text(
                                         if (indicator.detected) "DETECTED" else "Clear",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (indicator.detected) colors.critical else colors.safe
+                                        style = androidx.compose.ui.text.TextStyle(fontSize = 10.sp),
+                                        color = if (indicator.detected) Color(0xFFEF4444).copy(alpha = 0.7f) else Color(0xFF10B981)
                                     )
                                 }
                             }
@@ -188,22 +219,21 @@ fun LiveThreatScreen() {
         // Analysis Status
         SectionHeader(title = "Analysis Status")
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, colors.border, RoundedCornerShape(14.dp)),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                AnalysisRow("SMS Channel", "Monitoring notifications", colors.safe)
-                AnalysisRow("Call Channel", "Listening for incoming calls", colors.safe)
-                AnalysisRow("Web Channel", "VPN traffic analysis", colors.warning)
-                AnalysisRow("Email Channel", "Monitoring email notifications", colors.safe)
+                AnalysisRow("SMS Channel", "Monitoring notifications", Color(0xFF4776E6))
+                AnalysisRow("Call Channel", "Listening for incoming calls", Color(0xFF8E54E9))
+                AnalysisRow("Web Channel", "VPN traffic analysis", Color(0xFF10B981))
+                AnalysisRow("Email Channel", "Monitoring email notifications", Color(0xFFEF4444))
             }
         }
 
@@ -211,43 +241,45 @@ fun LiveThreatScreen() {
         SectionHeader(title = "Recommended Actions")
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
                 onClick = { /* Block action */ },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = colors.critical),
-                shape = MaterialTheme.shapes.medium
+                modifier = Modifier.weight(1.1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
             ) {
-                Icon(Icons.Filled.Block, null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Block")
+                Icon(Icons.Filled.Block, null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Block", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
             Button(
                 onClick = { /* Warn action */ },
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = colors.warning),
-                shape = MaterialTheme.shapes.medium
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B)),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp)
             ) {
-                Icon(Icons.Filled.Warning, null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Warn")
+                Icon(Icons.Filled.Warning, null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Warn", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
             OutlinedButton(
                 onClick = { /* Ignore action */ },
                 modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textSecondary),
-                shape = MaterialTheme.shapes.medium,
-                border = ButtonDefaults.outlinedButtonBorder(true).copy(
-                    brush = androidx.compose.ui.graphics.SolidColor(colors.border)
-                )
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                contentPadding = PaddingValues(horizontal = 8.dp)
             ) {
-                Text("Ignore")
+                Text("Ignore", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
             }
         }
 
-        Spacer(modifier = Modifier.height(80.dp))
+        RakshakXFooter()
     }
+}
 }
 
 private data class ThreatIndicator(

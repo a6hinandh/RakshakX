@@ -20,6 +20,9 @@ import kotlinx.coroutines.launch
  * Primary detection is handled by NotificationListenerService.
  * Keep this registered as a bonus catch for edge cases.
  */
+import com.security.rakshakx.core.SettingsStore
+import kotlinx.coroutines.flow.first
+
 class SmsReceiver : BroadcastReceiver() {
 
     companion object {
@@ -37,6 +40,11 @@ class SmsReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
 
             try {
+                val settings = SettingsStore.getInstance(context)
+                if (!settings.smsEnabled.value) {
+                    Log.d(TAG, "SMS Protection is disabled in settings. Skipping analysis.")
+                    return@launch
+                }
 
                 val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
 

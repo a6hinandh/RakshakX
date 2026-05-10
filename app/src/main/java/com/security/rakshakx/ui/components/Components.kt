@@ -271,77 +271,84 @@ fun ThreatCard(
     val colors = LocalRakshakXColors.current
     Card(
         modifier = modifier
-            .fillMaxWidth()
-            .border(1.dp, colors.border, RoundedCornerShape(14.dp)),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = colors.cardBackground)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = entry.channel.icon,
-                        contentDescription = null,
-                        tint = entry.channel.color,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    val accentColor = when (entry.channel) {
+                        Channel.SMS -> Color(0xFF4776E6)
+                        Channel.CALL -> Color(0xFF8E54E9)
+                        Channel.WEB -> Color(0xFF10B981)
+                        Channel.EMAIL -> Color(0xFFEF4444)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .background(accentColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = entry.channel.icon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                     Text(
                         text = entry.channel.label,
                         style = MaterialTheme.typography.labelMedium,
-                        color = entry.channel.color
+                        color = accentColor,
+                        fontWeight = FontWeight.Bold
                     )
                 }
                 SeverityBadge(entry.severity)
             }
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = entry.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = entry.description,
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary,
+                color = Color.White.copy(alpha = 0.6f),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "From: ${entry.source}",
+                    text = "Source: ${entry.source}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textMuted,
+                    color = Color.White.copy(alpha = 0.4f),
                     maxLines = 1,
                     modifier = Modifier.weight(1f)
                 )
                 Text(
                     text = formatTimestamp(entry.timestamp),
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textMuted
+                    color = Color.White.copy(alpha = 0.4f)
                 )
-            }
-            // Indicators
-            if (entry.indicators.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    entry.indicators.take(3).forEach { indicator ->
-                        IndicatorChip(text = indicator)
-                    }
-                }
             }
         }
     }
@@ -620,19 +627,43 @@ fun SectionHeader(
     modifier: Modifier = Modifier,
     action: @Composable (() -> Unit)? = null
 ) {
-    val colors = LocalRakshakXColors.current
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.textPrimary,
-            fontWeight = FontWeight.SemiBold
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.5f),
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.5.sp
         )
         action?.invoke()
+    }
+}
+
+@Composable
+fun RakshakXFooter(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.width(40.dp),
+            thickness = 2.dp,
+            color = Color.White.copy(alpha = 0.1f)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Developed by InnovateX",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.3f),
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 

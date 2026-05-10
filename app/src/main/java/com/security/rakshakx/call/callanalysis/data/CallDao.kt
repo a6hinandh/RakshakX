@@ -41,5 +41,8 @@ interface CallDao {
     // NEW: get the most recent call
     @Query("SELECT * FROM call_records ORDER BY timestamp DESC LIMIT 1")
     suspend fun getLastCall(): CallRecord?
+
+    @Query("DELETE FROM call_records WHERE timestamp < :timestamp")
+    suspend fun deleteOldCalls(timestamp: Long)
 }
 

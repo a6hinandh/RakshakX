@@ -14,11 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.data.*
 import com.security.rakshakx.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,26 +50,33 @@ fun ThreatLogsScreen() {
         channelMatch && searchMatch
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background)
-            .padding(horizontal = 20.dp)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
+                )
+            )
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // Header
-        Text(
-            "Threat Intelligence",
-            style = MaterialTheme.typography.headlineMedium,
-            color = colors.textPrimary,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            "${threats.size} events across all channels",
-            style = MaterialTheme.typography.bodySmall,
-            color = colors.textMuted
-        )
+            // Header
+            Text(
+                "Verified Threats",
+                style = MaterialTheme.typography.headlineLarge,
+                color = Color.White
+            )
+            Text(
+                "${threats.size} events across all channels",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.6f)
+            )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -94,48 +103,59 @@ fun ThreatLogsScreen() {
         Spacer(modifier = Modifier.height(12.dp))
 
         // Channel filter chips
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        androidx.compose.foundation.lazy.LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(end = 20.dp) // Extra padding for the last item
         ) {
-            FilterChip(
-                selected = selectedChannel == null,
-                onClick = { selectedChannel = null },
-                label = { Text("All", style = MaterialTheme.typography.labelMedium) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                    selectedLabelColor = colors.primary,
-                    containerColor = colors.cardBackground,
-                    labelColor = colors.textSecondary
-                ),
-                border = FilterChipDefaults.filterChipBorder(
-                    borderColor = colors.border,
-                    selectedBorderColor = colors.primary.copy(alpha = 0.3f),
-                    enabled = true,
-                    selected = selectedChannel == null
+            item {
+                FilterChip(
+                    selected = selectedChannel == null,
+                    onClick = { selectedChannel = null },
+                    label = { Text("All", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color.White.copy(alpha = 0.1f),
+                        selectedLabelColor = Color.White,
+                        containerColor = Color.White.copy(alpha = 0.02f),
+                        labelColor = Color.White.copy(alpha = 0.5f)
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = Color.White.copy(alpha = 0.05f),
+                        selectedBorderColor = Color.White.copy(alpha = 0.2f),
+                        enabled = true,
+                        selected = selectedChannel == null
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
-            )
-            Channel.entries.forEach { channel ->
+            }
+            items(Channel.entries.toList()) { channel ->
+                val accentColor = when (channel) {
+                    Channel.SMS -> Color(0xFF4776E6)
+                    Channel.CALL -> Color(0xFF8E54E9)
+                    Channel.WEB -> Color(0xFF10B981)
+                    Channel.EMAIL -> Color(0xFFEF4444)
+                }
                 FilterChip(
                     selected = selectedChannel == channel,
                     onClick = { selectedChannel = if (selectedChannel == channel) null else channel },
-                    label = { Text(channel.label, style = MaterialTheme.typography.labelMedium) },
+                    label = { Text(channel.label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) },
                     leadingIcon = {
                         Icon(channel.icon, null, modifier = Modifier.size(16.dp),
-                            tint = if (selectedChannel == channel) channel.color else colors.textMuted)
+                            tint = if (selectedChannel == channel) accentColor else Color.White.copy(alpha = 0.3f))
                     },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = channel.color.copy(alpha = 0.1f),
-                        selectedLabelColor = channel.color,
-                        containerColor = colors.cardBackground,
-                        labelColor = colors.textSecondary
+                        selectedContainerColor = accentColor.copy(alpha = 0.15f),
+                        selectedLabelColor = accentColor,
+                        containerColor = Color.White.copy(alpha = 0.02f),
+                        labelColor = Color.White.copy(alpha = 0.5f)
                     ),
                     border = FilterChipDefaults.filterChipBorder(
-                        borderColor = colors.border,
-                        selectedBorderColor = channel.color.copy(alpha = 0.3f),
+                        borderColor = Color.White.copy(alpha = 0.05f),
+                        selectedBorderColor = accentColor.copy(alpha = 0.3f),
                         enabled = true,
                         selected = selectedChannel == channel
-                    )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
                 )
             }
         }
@@ -172,7 +192,11 @@ fun ThreatLogsScreen() {
                 items(filteredThreats, key = { it.id }) { entry ->
                     ThreatCard(entry = entry)
                 }
+                item {
+                    RakshakXFooter()
+                }
             }
+        }
         }
     }
 }

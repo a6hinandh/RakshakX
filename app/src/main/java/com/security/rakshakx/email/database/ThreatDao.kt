@@ -19,4 +19,7 @@ interface ThreatDao {
         "SELECT * FROM threats ORDER BY timestamp DESC"
     )
     suspend fun getAllThreats(): List<ThreatEntity>
+
+    @Query("DELETE FROM threats WHERE timestamp < :timestamp")
+    suspend fun deleteOldThreats(timestamp: Long)
 }
