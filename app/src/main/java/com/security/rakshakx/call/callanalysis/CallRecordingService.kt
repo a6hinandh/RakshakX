@@ -1,7 +1,10 @@
 package com.security.rakshakx.call.callanalysis
 
 import android.Manifest
-import android.app.*
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,102 +15,229 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.security.rakshakx.R
-import com.security.rakshakx.notifications.CallFraudNotifications
 import com.security.rakshakx.call.callanalysis.ml.DummyFraudTextModel
 import com.security.rakshakx.call.callanalysis.ml.FraudTextModel
 import kotlinx.coroutines.*
 
-/**
- * CallRecordingService
- *
- * Foreground service for call recording and analysis.
- * Required on Android 12+ to avoid background restrictions.
- * Shows persistent notification while recording.
- */
 class CallRecordingService : Service() {
 
     companion object {
-        private const val TAG = "CallRecordingService"
-        private const val CHANNEL_ID = "rakshakx_recording"
-        private const val NOTIFICATION_ID = 2001
 
-        const val ACTION_START_RECORDING = "START_RECORDING"
-        const val ACTION_STOP_RECORDING = "STOP_RECORDING"
-        const val ACTION_DEV_TEST = "DEV_TEST"
-        const val EXTRA_PHONE_NUMBER = "phone_number"
+        private const val CHANNEL_ID =
+            "rakshakx_recording"
 
-        fun startRecording(context: Context, phoneNumber: String) {
-            val intent = Intent(context, CallRecordingService::class.java).apply {
-                action = ACTION_START_RECORDING
-                putExtra(EXTRA_PHONE_NUMBER, phoneNumber)
-            }
+        private const val NOTIFICATION_ID =
+            2001
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+        const val ACTION_START_RECORDING =
+            "START_RECORDING"
+
+        const val ACTION_STOP_RECORDING =
+            "STOP_RECORDING"
+
+        const val ACTION_DEV_TEST =
+            "DEV_TEST"
+
+        const val EXTRA_PHONE_NUMBER =
+            "phone_number"
+
+        fun startRecording(
+            context: Context,
+            phoneNumber: String
+        ) {
+
+            val intent =
+                Intent(
+                    context,
+                    CallRecordingService::class.java
+                ).apply {
+
+                    action = ACTION_START_RECORDING
+
+                    putExtra(
+                        EXTRA_PHONE_NUMBER,
+                        phoneNumber
+                    )
+                }
+
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.O
+            ) {
+
+                context.startForegroundService(
+                    intent
+                )
+
             } else {
+
                 context.startService(intent)
             }
         }
 
-        fun stopRecording(context: Context) {
-            val intent = Intent(context, CallRecordingService::class.java).apply {
-                action = ACTION_STOP_RECORDING
-            }
+        fun stopRecording(
+            context: Context
+        ) {
+
+            val intent =
+                Intent(
+                    context,
+                    CallRecordingService::class.java
+                ).apply {
+
+                    action = ACTION_STOP_RECORDING
+                }
+
             context.startService(intent)
         }
     }
 
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
-    private lateinit var recorder: CallAudioRecorder
-    private lateinit var transcriber: WhisperTranscriber
-    private lateinit var speechTranscriber: AndroidSpeechTranscriber
-    private lateinit var classifier: FraudIntentClassifier
-    private lateinit var mlClassifier: FraudMLClassifier
-    private lateinit var engine: PreActionDecisionEngine
+    // ==========================================
+    // Scope
+    // ==========================================
+    private val scope =
+        CoroutineScope(
+            Dispatchers.Main +
+                    SupervisorJob()
+        )
 
-    // ML model dependencies (pluggable for testing)
-    private val fraudTextModel: FraudTextModel by lazy { DummyFraudTextModel() }
-    private var useSpeechFallback = false
+    // ==========================================
+    // Components
+    // ==========================================
+    private lateinit var recorder:
+            CallAudioRecorder
 
-    override fun onCreate() {
-        super.onCreate()
-        createNotificationChannel()
+    private lateinit var voskTranscriber:
+            VoskTranscriber
 
-        recorder = CallAudioRecorder(this)
-        transcriber = WhisperTranscriber(this)
-        speechTranscriber = AndroidSpeechTranscriber(this)
-        classifier = FraudIntentClassifier()
-        mlClassifier = FraudMLClassifier(fraudTextModel)  // Inject pluggable model
-        engine = PreActionDecisionEngine()
+    @Volatile
+    private var voskReady = false
 
-        Log.d(TAG, "CallRecordingService initialized with DummyFraudTextModel")
+    private lateinit var classifier:
+            FraudIntentClassifier
+
+    private lateinit var mlClassifier:
+            FraudMLClassifier
+
+    private lateinit var engine:
+            PreActionDecisionEngine
+
+    // ==========================================
+    // ML Model
+    // ==========================================
+    private val fraudTextModel:
+            FraudTextModel by lazy {
+
+        DummyFraudTextModel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_START_RECORDING -> {
-                val phoneNumber = intent.getStringExtra(EXTRA_PHONE_NUMBER) ?: "Unknown"
-                val notification = createNotification(phoneNumber, "Recording...")
+    // ==========================================
+    // CREATE
+    // ==========================================
+    override fun onCreate() {
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        super.onCreate()
+
+        Log.d(
+            "RAKSHAK_DEBUG",
+            "CallRecordingService created"
+        )
+
+        createNotificationChannel()
+
+        recorder =
+            CallAudioRecorder(this)
+
+        Log.d(
+            "RAKSHAK_DEBUG",
+            "CallAudioRecorder initialized"
+        )
+
+        voskTranscriber =
+            VoskTranscriber(this)
+
+        voskReady = false
+
+        classifier =
+            FraudIntentClassifier()
+
+        mlClassifier =
+            FraudMLClassifier(
+                fraudTextModel
+            )
+
+        engine =
+            PreActionDecisionEngine()
+
+        Log.d(
+            "RAKSHAK_DEBUG",
+            "Fraud pipeline initialized"
+        )
+    }
+
+    // ==========================================
+    // START COMMAND
+    // ==========================================
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int
+    ): Int {
+
+        Log.d(
+            "RAKSHAK_DEBUG",
+            "onStartCommand = ${intent?.action}"
+        )
+
+        when (intent?.action) {
+
+            ACTION_START_RECORDING -> {
+
+                val phoneNumber =
+                    intent.getStringExtra(
+                        EXTRA_PHONE_NUMBER
+                    ) ?: "Unknown"
+
+                val notification =
+                    createNotification(
+                        phoneNumber,
+                        "Listening..."
+                    )
+
+                if (
+                    Build.VERSION.SDK_INT >=
+                    Build.VERSION_CODES.Q
+                ) {
+
                     startForeground(
                         NOTIFICATION_ID,
                         notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                        ServiceInfo
+                            .FOREGROUND_SERVICE_TYPE_MICROPHONE
                     )
+
                 } else {
-                    startForeground(NOTIFICATION_ID, notification)
+
+                    startForeground(
+                        NOTIFICATION_ID,
+                        notification
+                    )
                 }
 
-                startRecordingAndAnalysis(phoneNumber)
+                startRealtimeFraudDetection(
+                    phoneNumber
+                )
             }
+
             ACTION_STOP_RECORDING -> {
-                stopRecordingAndFinish()
+
+                stopRealtimeDetection()
             }
+
             ACTION_DEV_TEST -> {
-                Log.i(TAG, "DEV_TEST action received - running ML test...")
+
                 runDevFraudTest()
-                // Stop immediately after test
+
                 stopSelf()
             }
         }
@@ -115,210 +245,406 @@ class CallRecordingService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startRecordingAndAnalysis(phoneNumber: String) {
+    // ==========================================
+    // REALTIME DETECTION
+    // ==========================================
+    private fun startRealtimeFraudDetection(
+        phoneNumber: String
+    ) {
+
         scope.launch(Dispatchers.IO) {
+
             try {
-                if (ContextCompat.checkSelfPermission(this@CallRecordingService, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "Starting realtime fraud detection"
+                )
+
+                if (
+                    ContextCompat.checkSelfPermission(
+                        this@CallRecordingService,
+                        Manifest.permission.RECORD_AUDIO
+                    ) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+
+                    Log.e(
+                        "RAKSHAK_DEBUG",
+                        "RECORD_AUDIO denied"
+                    )
+
                     stopSelf()
+
                     return@launch
                 }
 
-                useSpeechFallback = !transcriber.isModelAvailable()
-                if (useSpeechFallback && !speechTranscriber.isAvailable()) {
-                    Log.e(TAG, "No ASR engine available: Whisper model missing and SpeechRecognizer unavailable")
-                    stopSelf()
-                    return@launch
-                }
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "RECORD_AUDIO granted"
+                )
 
-                val captureStatus = if (useSpeechFallback) {
-                    "Capture: SpeechRecognizer fallback active"
-                } else {
-                    "Capture: Whisper model active"
-                }
-                val captureSource = if (useSpeechFallback) {
-                    "Source: SpeechRecognizer"
-                } else {
-                    "Source: Whisper TFLite"
-                }
-                broadcastCaptureStatus(captureStatus)
-                broadcastCaptureSource(captureSource)
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "Initializing Vosk before audio capture"
+                )
 
-                // Update notification
-                updateNotification(phoneNumber, "Listening for fraud patterns...")
+                voskReady =
+                    try {
 
-                // Continuous Interception Loop
-                while (isActive) {
-                    val transcript = if (useSpeechFallback) {
-                        speechTranscriber.transcribeOnce(5000)
-                    } else {
-                        // 1. Record a 5-second chunk
-                        recorder.startPcmRecording() ?: break
-                        delay(5000)
-                        recorder.stopRecording()
+                        voskTranscriber.initialize()
+                    } catch (e: Exception) {
 
-                        // 2. Transcribe Chunk
-                        val pcmData = recorder.getPcmData() ?: continue
-                        try {
-                            withTimeout(5000) { transcriber.transcribePcm(pcmData) }
-                        } catch (_: Exception) { "" }
+                        Log.e(
+                            "RAKSHAK_DEBUG",
+                            "Vosk initialize threw",
+                            e
+                        )
+
+                        false
                     }
 
-                    if (transcript.isNotBlank()) {
-                        // 3. Broadcast to Overlay
-                        val intent = Intent(CallOverlayActivity.ACTION_TRANSCRIPT_UPDATE).apply {
-                            putExtra(CallOverlayActivity.EXTRA_TRANSCRIPT, transcript)
-                        }
-                        sendBroadcast(intent)
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "Vosk init success = $voskReady"
+                )
 
-                        // 4. Hybrid Analysis
-                        val mlResult = mlClassifier.computeMLResult(transcript)
-                        val (hybridScore, explanation) = classifier.computeHybridScore(transcript, mlResult)
+                if (!voskReady) {
 
-                        val analysisIntent = Intent(CallOverlayActivity.ACTION_ANALYSIS_UPDATE).apply {
-                            putExtra(CallOverlayActivity.EXTRA_RISK_SCORE, hybridScore)
-                            putExtra(CallOverlayActivity.EXTRA_RISK_LABEL, engine.decideAction(hybridScore).action.name)
-                            putExtra(CallOverlayActivity.EXTRA_RISK_REASON, explanation)
-                        }
-                        sendBroadcast(analysisIntent)
+                    Log.e(
+                        "RAKSHAK_DEBUG",
+                        "Vosk not ready; stopping service"
+                    )
 
-                        broadcastCaptureStatus(
-                            if (useSpeechFallback) {
-                                "Capture: SpeechRecognizer fallback active"
-                            } else {
-                                "Capture: Whisper model active"
-                            }
-                        )
-                        broadcastCaptureSource(
-                            if (useSpeechFallback) {
-                                "Source: SpeechRecognizer"
-                            } else {
-                                "Source: Whisper TFLite"
-                            }
-                        )
+                    broadcastCaptureStatus(
+                        "Capture: Vosk init failed"
+                    )
 
-                        Log.d(TAG, "Live Analysis: score=$hybridScore, transcript=$transcript")
+                    stopSelf()
 
-                        // 5. Trigger Alert if High Risk
-                        if (hybridScore >= RiskConfig.THRESHOLD_HIGH) {
-                            withContext(Dispatchers.Main) {
-                                FraudAlertActivity.showHighRiskWarning(
-                                    this@CallRecordingService,
-                                    phoneNumber,
-                                    hybridScore,
-                                    explanation
+                    return@launch
+                }
+
+                broadcastCaptureStatus(
+                    "Capture: Vosk Streaming Active"
+                )
+
+                broadcastCaptureSource(
+                    "Source: Speakerphone + Mic"
+                )
+
+                updateNotification(
+                    phoneNumber,
+                    "Live AI scam detection active"
+                )
+
+                // ==================================
+                // LIVE AUDIO STREAM
+                // ==================================
+                recorder.setAudioChunkListener(
+
+                    object :
+                        CallAudioRecorder
+                        .AudioChunkListener {
+
+                        override fun onAudioChunk(
+                            data: ByteArray,
+                            length: Int
+                        ) {
+
+                            try {
+
+                                // Vosk is initialized before PCM starts; guard defensively.
+                                if (!voskReady) {
+
+                                    return
+                                }
+
+                                // ==========================
+                                // PROCESS AUDIO
+                                // ==========================
+                                val transcript =
+                                    voskTranscriber.processAudio(
+                                        data,
+                                        length
+                                    )
+
+                                // ==========================
+                                // EMPTY RESULT
+                                // ==========================
+                                if (transcript.isBlank()) {
+
+                                    return
+                                }
+
+                                // ==========================
+                                // SUCCESS LOG
+                                // ==========================
+                                Log.d(
+                                    "RAKSHAK_DEBUG",
+                                    "TRANSCRIPT SUCCESS = $transcript"
+                                )
+
+                            } catch (e: Exception) {
+
+                                Log.e(
+                                    "RAKSHAK_DEBUG",
+                                    "Audio callback failed",
+                                    e
                                 )
                             }
-                            // Persist result
-                            saveCallRecord(phoneNumber, transcript, hybridScore, explanation, engine.decideAction(hybridScore))
-                            break // Stop loop after alert
                         }
                     }
+                )
+
+                val pcmPath =
+                    recorder.startPcmRecording()
+
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "PCM path = $pcmPath"
+                )
+
+                if (pcmPath == null) {
+
+                    Log.e(
+                        "RAKSHAK_DEBUG",
+                        "PCM recording failed"
+                    )
+
+                    stopSelf()
+
+                    return@launch
                 }
 
+                Log.d(
+                    "RAKSHAK_DEBUG",
+                    "Realtime Vosk streaming active"
+                )
+
             } catch (e: Exception) {
-                Log.e(TAG, "Live Interception failed", e)
-            } finally {
-                stopSelf()
+
+                Log.e(
+                    "RAKSHAK_DEBUG",
+                    "Realtime detection failed",
+                    e
+                )
             }
         }
     }
 
-    private suspend fun saveCallRecord(
-        phoneNumber: String,
-        transcript: String,
-        score: Float,
-        explanation: String,
-        decision: FraudDecision
-    ) {
-        val repository = com.security.rakshakx.call.callanalysis.data.CallAnalysisRepository(this)
-        val record = com.security.rakshakx.call.callanalysis.data.CallRecord(
-            phoneNumber = phoneNumber,
-            transcript = transcript,
-            riskScore = score,
-            action = decision.action.name,
-            reason = explanation,
-            timestamp = System.currentTimeMillis()
-        )
-        repository.saveCallRecord(record)
+    // ==========================================
+    // STOP
+    // ==========================================
+    private fun stopRealtimeDetection() {
+
+        try {
+
+            Log.d(
+                "RAKSHAK_DEBUG",
+                "Stopping realtime detection"
+            )
+
+            recorder.stopRecording()
+
+            stopSelf()
+
+        } catch (e: Exception) {
+
+            Log.e(
+                "RAKSHAK_DEBUG",
+                "Stop failed",
+                e
+            )
+        }
     }
 
-    private fun stopRecordingAndFinish() {
-        recorder.stopRecording()
-        stopSelf()
-    }
-
+    // ==========================================
+    // NOTIFICATION CHANNEL
+    // ==========================================
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Call Recording & Analysis",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows when RakshakX is recording and analyzing calls"
-            }
 
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+        if (
+            Build.VERSION.SDK_INT >=
+            Build.VERSION_CODES.O
+        ) {
+
+            val channel =
+                NotificationChannel(
+                    CHANNEL_ID,
+                    "Call Recording & Analysis",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+
+                    description =
+                        "Realtime scam detection"
+                }
+
+            getSystemService(
+                NotificationManager::class.java
+            ).createNotificationChannel(
+                channel
+            )
         }
     }
 
-    private fun createNotification(phoneNumber: String, status: String): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("RakshakX - Analyzing Call")
-            .setContentText("$status ($phoneNumber)")
-            .setSmallIcon(R.drawable.ic_recording)
+    // ==========================================
+    // UPDATE NOTIFICATION
+    // ==========================================
+    private fun updateNotification(
+        phoneNumber: String,
+        status: String
+    ) {
+
+        val notification =
+            NotificationCompat.Builder(
+                this,
+                CHANNEL_ID
+            )
+                .setContentTitle(
+                    "RakshakX AI Protection"
+                )
+                .setContentText(
+                    "$status ($phoneNumber)"
+                )
+                .setSmallIcon(
+                    R.drawable.ic_recording
+                )
+                .setOngoing(true)
+                .setPriority(
+                    NotificationCompat.PRIORITY_LOW
+                )
+                .build()
+
+        getSystemService(
+            NotificationManager::class.java
+        ).notify(
+            NOTIFICATION_ID,
+            notification
+        )
+    }
+
+    // ==========================================
+    // CREATE NOTIFICATION
+    // ==========================================
+    private fun createNotification(
+        phoneNumber: String,
+        status: String
+    ): Notification {
+
+        return NotificationCompat.Builder(
+            this,
+            CHANNEL_ID
+        )
+            .setContentTitle(
+                "RakshakX AI Protection"
+            )
+            .setContentText(
+                "$status ($phoneNumber)"
+            )
+            .setSmallIcon(
+                R.drawable.ic_recording
+            )
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(
+                NotificationCompat.PRIORITY_LOW
+            )
             .build()
     }
 
-    private fun updateNotification(phoneNumber: String, status: String) {
-        val notification = createNotification(phoneNumber, status)
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
-    }
+    // ==========================================
+    // STATUS BROADCAST
+    // ==========================================
+    private fun broadcastCaptureStatus(
+        status: String
+    ) {
 
-    private fun broadcastCaptureStatus(status: String) {
-        val intent = Intent(CallOverlayActivity.ACTION_CAPTURE_UPDATE).apply {
-            putExtra(CallOverlayActivity.EXTRA_CAPTURE_STATUS, status)
-        }
+        val intent =
+            Intent(
+                CallOverlayActivity
+                    .ACTION_CAPTURE_UPDATE
+            ).apply {
+
+                putExtra(
+                    CallOverlayActivity
+                        .EXTRA_CAPTURE_STATUS,
+                    status
+                )
+            }
+
         sendBroadcast(intent)
     }
 
-    private fun broadcastCaptureSource(source: String) {
-        val intent = Intent(CallOverlayActivity.ACTION_CAPTURE_SOURCE_UPDATE).apply {
-            putExtra(CallOverlayActivity.EXTRA_CAPTURE_SOURCE, source)
-        }
+    // ==========================================
+    // SOURCE BROADCAST
+    // ==========================================
+    private fun broadcastCaptureSource(
+        source: String
+    ) {
+
+        val intent =
+            Intent(
+                CallOverlayActivity
+                    .ACTION_CAPTURE_SOURCE_UPDATE
+            ).apply {
+
+                putExtra(
+                    CallOverlayActivity
+                        .EXTRA_CAPTURE_SOURCE,
+                    source
+                )
+            }
+
         sendBroadcast(intent)
     }
 
-    /**
-     * Dev hook for testing ML classifier without real call recording.
-     * Call this to quickly verify ML inference is working.
-     */
-    fun runDevFraudTest() {
+    // ==========================================
+    // DEV TEST
+    // ==========================================
+    private fun runDevFraudTest() {
+
         scope.launch(Dispatchers.IO) {
-            val testTranscript = "sir your kyc is expiring today please share otp to avoid account block"
-            val mlResult = mlClassifier.computeMLResult(testTranscript)
+
+            val testTranscript =
+                "your bank account will be blocked please share otp"
+
+            val mlResult =
+                mlClassifier.computeMLResult(
+                    testTranscript
+                )
 
             Log.d(
-                "RakshakX",
-                "Dev ML test: score=${String.format("%.2f", mlResult.score)}, " +
-                "reasons=${mlResult.reasons.joinToString("; ")}, " +
-                "label=${mlResult.label}"
+                "RAKSHAK_DEBUG",
+                "Dev score = ${mlResult.score}"
             )
-
-            withContext(Dispatchers.Main) {
-                Log.i(TAG, "Dev test completed. Check logcat for ML output.")
-            }
         }
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    // ==========================================
+    // BIND
+    // ==========================================
+    override fun onBind(
+        intent: Intent?
+    ): IBinder? = null
 
+    // ==========================================
+    // DESTROY
+    // ==========================================
     override fun onDestroy() {
+
         super.onDestroy()
+
+        Log.d(
+            "RAKSHAK_DEBUG",
+            "CallRecordingService destroyed"
+        )
+
+        recorder.release()
+
+        voskTranscriber.release()
+
+        voskReady = false
+
         scope.cancel()
     }
 }
-
