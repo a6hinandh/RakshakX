@@ -14,17 +14,28 @@ class CallScamDetector(private val context: Context) {
     fun analyze(callerNumber: String, transcript: String, isLive: Boolean = false): ModelResult {
         Log.d(TAG, "Analyzing call from=$callerNumber live=$isLive length=${transcript.length}")
         val fullText = "Caller: $callerNumber\nTranscript:\n$transcript"
-        val result   = RakshakXApplication.scamRouter?.classify(fullText, "call")
-            ?: ModelResult(isScam = false, confidence = 0f, label = "SAFE", modelUsed = "router_null", channel = "call")
-
-        Log.d(TAG, "Call result: $result")
-
-        val shouldAlert = if (isLive) {
-            result.isScam && result.confidence > 0.85f
-        } else {
-            result.isScam
+        
+        val router = RakshakXApplication.scamRouter
+        if (router == null) {
+            return ModelResult(isScam = false, confidence = 0f, label = "SAFE", modelUsed = "router_null", channel = "call")
         }
-        if (shouldAlert) alert.handleResult(result)
+
+        val result = router.classify(fullText, "call")
+        Log.d(TAG, "Call Hybrid Result: $result")
+
+        // ── HYBRID ALERT LOGIC ───────────────────────────────────────────────
+        val shouldAlert = if (isLive) {
+            // Live calls require higher threshold to avoid interrupting normal calls
+            result.finalScore >= 0.70f 
+        } else {
+            result.finalScore >= 0.50f
+        }
+
+        if (shouldAlert) {
+            Log.i(TAG, "SCAM DETECTED on call (Live=$isLive). Triggering alert.")
+            alert.handleResult(result)
+        }
+
         return result
     }
 

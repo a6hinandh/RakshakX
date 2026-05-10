@@ -74,6 +74,7 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     )
 
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
+    private var connectedTime: Long = 0
 
     override fun onCreate() {
         super.onCreate()
@@ -94,12 +95,14 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         Log.d("RAKSHAK_LISTENER", "CONNECTED SUCCESSFULLY")
         super.onListenerConnected()
-        Log.d(TAG, "onListenerConnected")
+        connectedTime = System.currentTimeMillis()
+        Log.d(TAG, "onListenerConnected at $connectedTime. Ignoring existing notifications.")
     }
 
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.w(TAG, "onListenerDisconnected")
+        connectedTime = 0
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isOurNotificationListenerAuthorized()) {
             try {
                 requestRebind(ComponentName(this, RakshakNotificationListenerService::class.java))
@@ -120,6 +123,12 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val pkg = sbn.packageName ?: return
         if (pkg == OWN_PACKAGE) return
+
+        // ── IGNORE OLD NOTIFICATIONS ──────────────────────────────────────────
+        if (sbn.postTime < connectedTime) {
+            Log.d(TAG, "Ignoring old notification from $pkg (posted at ${sbn.postTime})")
+            return
+        }
 
         val extras = sbn.notification.extras ?: return
         val title = extras.getString(Notification.EXTRA_TITLE) ?: ""
@@ -151,8 +160,6 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         }
     }
 
-
-
     private fun handleSmsNotification(pkg: String, title: String, body: String) {
         Log.d(TAG, "Processing SMS notification from: $pkg")
         if (!SmsDeduplicationGuard.shouldProcess(this, title, body)) {
@@ -162,18 +169,8 @@ class RakshakNotificationListenerService : NotificationListenerService() {
 
         coroutineScope.launch {
             try {
+                // ── NEW HYBRID ML PIPELINE ───────────────────────────────────
                 SmsScamDetector(this@RakshakNotificationListenerService).analyze(sender = title, body = body)
-
-                val risk = RiskEngine.calculate(body, this@RakshakNotificationListenerService)
-                if (risk >= RiskEngine.ALERT_THRESHOLD) {
-                    SmsFraudNotifications.showFraudAlert(
-                        context = this@RakshakNotificationListenerService,
-                        sender = title,
-                        message = body,
-                        riskScore = risk,
-                        source = "SMS"
-                    )
-                }
 
                 if (title.isNotBlank()) {
                     val orchestrator = FraudMonitoringForegroundService.getOrchestrator(applicationContext)
@@ -186,35 +183,30 @@ class RakshakNotificationListenerService : NotificationListenerService() {
     }
 
     private fun handleEmailNotification(pkg: String, ingress: EmailNotificationIngress) {
-        Log.d(TAG, "Processing Email notification from: $pkg (sender=${ingress.sender.take(48)}…)")
-
-        val pipelineTitle = ingress.subject.ifBlank { ingress.bodySnippet.take(120).trim() }
-        val pipelineBody = buildString {
-            val s = ingress.sender
-            if (s.isNotBlank() && !s.equals(pkg, ignoreCase = true)) {
-                append("From: ").appendLine(s)
-            }
-            if (ingress.subject.isNotBlank()) {
-                append("Subject: ").appendLine(ingress.subject)
-            }
-            append(ingress.bodySnippet)
-        }.trim()
+        Log.d(TAG, "Processing Email notification from: $pkg")
 
         coroutineScope.launch {
             try {
-                EmailScamDetector(this@RakshakNotificationListenerService).analyze(
+                // ── NEW HYBRID ML PIPELINE ───────────────────────────────────
+                val result = EmailScamDetector(this@RakshakNotificationListenerService).analyze(
                     sender = ingress.sender.ifBlank { pkg },
                     subject = ingress.subject,
-                    body = ingress.bodySnippet.ifBlank { pipelineBody }
+                    body = ingress.bodySnippet
                 )
-                val result = EmailThreatPipeline.process(
-                    context = this@RakshakNotificationListenerService,
-                    title = pipelineTitle.ifBlank { ingress.sender },
-                    body = pipelineBody.ifBlank { ingress.bodySnippet },
-                    persistenceScope = coroutineScope,
-                    logPrefix = "Processing Email from: $pkg"
-                )
-                Log.d(TAG, "Email ingress result: ${result.riskLevel} score=${result.score}")
+
+                // ── Forwarding to Legacy DB for stats/tracking ───────────────
+                if (result.finalScore >= 0.50f) {
+                    val pipelineTitle = ingress.subject.ifBlank { ingress.bodySnippet.take(120).trim() }
+                    val pipelineBody = "Sender: ${ingress.sender}\nSubject: ${ingress.subject}\n${ingress.bodySnippet}"
+                    
+                    EmailThreatPipeline.process(
+                        context = this@RakshakNotificationListenerService,
+                        title = pipelineTitle.ifBlank { ingress.sender },
+                        body = pipelineBody,
+                        persistenceScope = coroutineScope,
+                        logPrefix = "Tracking Email in DB: $pkg"
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to process email notification pipeline", e)
             }

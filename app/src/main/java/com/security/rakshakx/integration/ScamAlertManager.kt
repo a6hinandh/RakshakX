@@ -44,8 +44,8 @@ class ScamAlertManager(private val context: Context) {
         val channelIcon = channelIcon(result.channel)
         val title       = "⚠️ Scam Detected — ${result.channel.uppercase()}"
         val body        = "$channelIcon ${describeResult(result)}\n" +
-                "Confidence: ${"%.0f".format(result.confidence * 100)}% • " +
-                "Detected by: ${modelLabel(result.modelUsed)}"
+                "Overall Score: ${"%.0f".format(result.finalScore * 100)}% • " +
+                "Detected by: Hybrid AI System"
 
         sendNotification(
             channelId  = CHANNEL_ID_HIGH,
@@ -58,7 +58,7 @@ class ScamAlertManager(private val context: Context) {
     private fun sendMediumAlert(result: ModelResult) {
         val title = "⚠ Suspicious Content — ${result.channel.uppercase()}"
         val body  = "${describeResult(result)} " +
-                "(${" %.0f".format(result.confidence * 100)}% confidence)"
+                "(Risk Score: ${"%.0f".format(result.finalScore * 100)}%)"
 
         sendNotification(
             channelId  = CHANNEL_ID_MEDIUM,
