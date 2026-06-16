@@ -27,7 +27,7 @@ import com.security.rakshakx.call.callanalysis.FraudIntentClassifier
 import com.security.rakshakx.call.callanalysis.PreActionDecisionEngine
 import com.security.rakshakx.call.callanalysis.RiskConfig
 import com.security.rakshakx.notifications.CallFraudNotifications
-import com.security.rakshakx.call.callanalysis.WhisperLiteTranscriber
+import com.security.rakshakx.call.callanalysis.VoskTranscriber
 import com.security.rakshakx.call.callanalysis.data.CallAnalysisRepository
 import com.security.rakshakx.call.callanalysis.data.CallRecord
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +45,7 @@ class RakshakXActivity : AppCompatActivity() {
     private lateinit var adapter: CallRecordAdapter
     private lateinit var repository: CallAnalysisRepository
     private val recorder = CallAudioRecorder(this)
-    private val transcriber by lazy { WhisperLiteTranscriber(this) }
+    private val transcriber by lazy { VoskTranscriber(this) }
     private val liveSpeechTranscriber by lazy { AndroidSpeechTranscriber(this) }
     private val classifier = FraudIntentClassifier()
     private val engine = PreActionDecisionEngine()
@@ -155,18 +155,18 @@ class RakshakXActivity : AppCompatActivity() {
     }
 
     private fun showLiveAudioDebugDialog() {
-        val whisperAvailable = transcriber.isModelAvailable()
+        val voskAvailable = transcriber.isModelAvailable()
         val speechRecognizerAvailable = liveSpeechTranscriber.isAvailable()
         val micRoutingAvailable = hasRecordAudioPermission() && isSpeakerRoutingAvailable()
         val callRecordingAllowed = DeviceCapabilities.supportsCallRecording(this)
 
         val message = buildString {
-            appendLine("Whisper model: ${if (whisperAvailable) "available" else "missing"}")
+            appendLine("Vosk model: ${if (voskAvailable) "available" else "missing"}")
             appendLine("SpeechRecognizer: ${if (speechRecognizerAvailable) "available" else "unavailable"}")
             appendLine("Speaker routing: ${if (micRoutingAvailable) "available" else "limited"}")
             appendLine("Call capture probe: ${if (callRecordingAllowed) "supported" else "blocked"}")
             appendLine()
-            appendLine("If Whisper is missing, the app falls back to SpeechRecognizer.")
+            appendLine("If Vosk is unavailable, the app falls back to SpeechRecognizer.")
         }
 
         AlertDialog.Builder(this)

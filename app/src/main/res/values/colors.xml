@@ -1,41 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- RakshakX Cybersecurity Palette -->
+    <!-- RakshakX Premium Security Palette -->
 
-    <!-- Background & Surface -->
-    <color name="navy_900">#FF060A14</color>
-    <color name="navy_800">#FF0B1120</color>
-    <color name="navy_700">#FF111827</color>
-    <color name="navy_600">#FF1A2332</color>
-    <color name="navy_500">#FF1E293B</color>
+    <!-- Core Background -->
+    <color name="obsidian">#FF080C14</color>
+    <color name="charcoal">#FF0E1420</color>
+    <color name="gunmetal">#FF151C2C</color>
+    <color name="slate">#FF1C2538</color>
+    <color name="slate_light">#FF243044</color>
 
-    <!-- Primary -->
-    <color name="cyan_400">#FF00E5FF</color>
-    <color name="cyan_500">#FF00BCD4</color>
-    <color name="cyan_600">#FF0088A3</color>
+    <!-- Primary — Royal Blue -->
+    <color name="royal_blue">#FF3B6DE6</color>
+    <color name="royal_blue_dark">#FF2B55C0</color>
+    <color name="royal_blue_light">#FF5A8AFF</color>
 
-    <!-- Teal -->
-    <color name="teal_400">#FF00E5C3</color>
-    <color name="teal_500">#FF00BFA5</color>
+    <!-- Secondary — Amethyst -->
+    <color name="amethyst">#FF7C5CE7</color>
+    <color name="amethyst_dark">#FF6441D4</color>
 
-    <!-- Status Colors -->
-    <color name="red_error">#FFF44336</color>
-    <color name="red_critical">#FFFF1744</color>
-    <color name="orange_warning">#FFFF9800</color>
-    <color name="amber_warning">#FFFFB300</color>
-    <color name="green_safe">#FF00E676</color>
+    <!-- Status -->
+    <color name="emerald">#FF0FA573</color>
+    <color name="crimson">#FFDC3545</color>
+    <color name="amber">#FFE6A23C</color>
+    <color name="gold">#FFD4A853</color>
 
     <!-- Text -->
-    <color name="text_primary">#FFE8EDF5</color>
-    <color name="text_secondary">#FF8892A4</color>
-    <color name="text_muted">#FF4A5568</color>
+    <color name="text_primary">#FFF0F2F5</color>
+    <color name="text_secondary">#FFA0AAB8</color>
+    <color name="text_muted">#FF6B7688</color>
 
-    <!-- Legacy (kept for existing XML references) -->
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- Legacy compat -->
+    <color name="navy_900">#FF080C14</color>
+    <color name="navy_800">#FF0E1420</color>
+    <color name="navy_700">#FF151C2C</color>
+    <color name="navy_600">#FF1C2538</color>
+    <color name="navy_500">#FF243044</color>
+    <color name="cyan_400">#FF3B6DE6</color>
+    <color name="cyan_500">#FF2B55C0</color>
+    <color name="cyan_600">#FF1E3A8A</color>
+    <color name="teal_400">#FF0FA573</color>
+    <color name="teal_500">#FF0B8A5E</color>
+    <color name="red_error">#FFDC3545</color>
+    <color name="red_critical">#FFDC3545</color>
+    <color name="orange_warning">#FFE6A23C</color>
+    <color name="amber_warning">#FFFFB300</color>
+    <color name="green_safe">#FF0FA573</color>
+    <color name="purple_200">#FF9B7FFF</color>
+    <color name="purple_500">#FF7C5CE7</color>
+    <color name="purple_700">#FF6441D4</color>
+    <color name="teal_200">#FF34D399</color>
+    <color name="teal_700">#FF0B8A5E</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

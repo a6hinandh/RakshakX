@@ -10,15 +10,14 @@ class ScamClassifierRouter(private val context: Context) {
     private val TAG = "ScamClassifierRouter"
 
     private val distilBert = DistilBertClassifier(context)
-    private val indicBert = IndicBertClassifier(context)
+    private var indicBert: IndicBertClassifier? = null
+    @Volatile private var indicBertInitialized = false
 
-    // Config loaded from assets/rakshakx_model/model_config.json
     private var confidenceThreshold = 0.75f
     private var hinglishThreshold = 0.65f
     private var languageDetectionThreshold = 0.15f
     private val indicLanguages = mutableSetOf<String>()
 
-    // Model specific configs
     private var distilBertConfig = JSONObject()
     private var indicBertConfig = JSONObject()
     private var labelsList = listOf("SAFE", "SCAM", "SUSPICIOUS")
@@ -26,7 +25,18 @@ class ScamClassifierRouter(private val context: Context) {
     init {
         loadConfig()
         distilBert.initialize(distilBertConfig, labelsList)
-        indicBert.initialize(indicBertConfig, labelsList)
+    }
+
+    @Synchronized
+    private fun getIndicBert(): IndicBertClassifier {
+        if (!indicBertInitialized) {
+            Log.d(TAG, "Lazy-loading IndicBERT model on first Indic text")
+            indicBert = IndicBertClassifier(context).also {
+                it.initialize(indicBertConfig, labelsList)
+            }
+            indicBertInitialized = true
+        }
+        return indicBert!!
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -70,7 +80,7 @@ class ScamClassifierRouter(private val context: Context) {
             if (detectedLang in indicLanguages && detectedLang != "en") {
                 Log.d(TAG, "Low ML confidence, routing to IndicBERT ($detectedLang)")
                 try {
-                    mlResult = indicBert.classify(text, channel)
+                    mlResult = getIndicBert().classify(text, channel)
                 } catch (e: Exception) {
                     Log.e(TAG, "IndicBERT failed: ${e.message}")
                 }
@@ -110,7 +120,7 @@ class ScamClassifierRouter(private val context: Context) {
 
     fun release() {
         distilBert.release()
-        indicBert.release()
+        indicBert?.release()
     }
 
     // ─── Language Detection (Unicode block ranges, zero dependencies) ─────────

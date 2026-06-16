@@ -19,6 +19,9 @@ object RakshakNotificationChannels {
     const val RECORDING = "rakshakx_recording"
     const val FRAUD_RESULTS = "rakshakx_fraud_alerts"
     const val VPN = "rakshakx_vpn"
+    const val ALERTS_CRITICAL = "rakshak_alerts_critical"
+    const val ALERTS_LOW = "rakshak_alerts_low"
+    const val DIGEST = "rakshak_digest"
 
     fun bootstrap(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -99,6 +102,42 @@ object RakshakNotificationChannels {
                     "RakshakX Protection",
                     NotificationManager.IMPORTANCE_LOW
                 )
+            )
+        }
+        if (manager.getNotificationChannel(ALERTS_CRITICAL) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    ALERTS_CRITICAL,
+                    "Critical Threat Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Immediate alerts for critical-severity threats"
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 500, 200, 500)
+                }
+            )
+        }
+        if (manager.getNotificationChannel(ALERTS_LOW) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    ALERTS_LOW,
+                    "Low Risk Notifications",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Batched notifications for low/medium severity threats"
+                    setShowBadge(false)
+                }
+            )
+        }
+        if (manager.getNotificationChannel(DIGEST) == null) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    DIGEST,
+                    "Security Digest",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "Daily/weekly security summary"
+                }
             )
         }
     }

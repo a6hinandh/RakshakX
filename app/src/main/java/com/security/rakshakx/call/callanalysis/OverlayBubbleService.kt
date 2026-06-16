@@ -25,9 +25,15 @@ import android.widget.Switch
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import android.telecom.TelecomManager
+import android.widget.Button
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.security.rakshakx.R
 import android.os.Handler
 import android.os.Looper
+
 class OverlayBubbleService : Service() {
 
     companion object {
@@ -332,6 +338,43 @@ class OverlayBubbleService : Service() {
                 )
             }
         }
+
+        view.findViewById<Button>(R.id.btnEndCall)?.setOnClickListener {
+            Log.d("RAKSHAK_DEBUG", "End Call pressed")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val telecom = getSystemService(TELECOM_SERVICE) as TelecomManager
+                    telecom.endCall()
+                }
+            } catch (e: Exception) {
+                Log.e("RAKSHAK_DEBUG", "Failed to end call", e)
+            }
+            stopSelf()
+        }
+
+        view.findViewById<Button>(R.id.btnReportNumber)?.setOnClickListener {
+            Log.d("RAKSHAK_DEBUG", "Report Number pressed: $phoneNumber")
+            try {
+                val db = com.security.rakshakx.call.core.storage.DatabaseFactory.getInstance(applicationContext)
+                CoroutineScope(Dispatchers.IO).launch {
+                    db.fraudDao().insertCall(
+                        com.security.rakshakx.data.entities.CallEventEntity(
+                            phoneNumber = phoneNumber,
+                            fraudRiskScore = 0.8f,
+                            detectedIntent = "USER_REPORTED",
+                            analyzed = true
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("RAKSHAK_DEBUG", "Failed to report number", e)
+            }
+        }
+
+        view.findViewById<Button>(R.id.btnMarkSafe)?.setOnClickListener {
+            Log.d("RAKSHAK_DEBUG", "Mark Safe pressed: $phoneNumber")
+            stopSelf()
+        }
     }
 
     // =========================
@@ -423,6 +466,22 @@ class OverlayBubbleService : Service() {
     // =========================
     // Update Transcript UI
     // =========================
+    private val fraudPhrases = mapOf(
+        "otp" to "⚠️ OTP sharing detected in conversation",
+        "one time password" to "⚠️ OTP sharing detected in conversation",
+        "ओटीपी" to "⚠️ OTP sharing detected in conversation",
+        "transfer" to "⚠️ Money transfer request detected",
+        "bank account" to "⚠️ Bank account details being discussed",
+        "aadhaar" to "⚠️ Aadhaar number request detected",
+        "आधार" to "⚠️ Aadhaar number request detected",
+        "arrest" to "⚠️ Intimidation tactic — 'arrest' threat detected",
+        "गिरफ्तार" to "⚠️ Intimidation tactic detected",
+        "police" to "⚠️ Authority impersonation — 'police' mentioned",
+        "remote access" to "⚠️ Remote access request — likely scam",
+        "anydesk" to "⚠️ Remote access app mentioned — likely scam",
+        "teamviewer" to "⚠️ Remote access app mentioned — likely scam"
+    )
+
     private fun updateTranscriptUi(transcript: String) {
 
         overlayView?.let {
@@ -438,6 +497,22 @@ class OverlayBubbleService : Service() {
 
             if (transcript.isNotBlank()) {
                 triggerTranscriptHaptic()
+                checkForFraudPhrases(transcript)
+            }
+        }
+    }
+
+    private fun checkForFraudPhrases(transcript: String) {
+        val lower = transcript.lowercase()
+        for ((phrase, warning) in fraudPhrases) {
+            if (lower.contains(phrase)) {
+                overlayView?.let {
+                    val tvWarning = it.findViewById<TextView>(R.id.tvContextWarning)
+                    tvWarning?.text = warning
+                    tvWarning?.visibility = View.VISIBLE
+                }
+                triggerTranscriptHaptic()
+                return
             }
         }
     }

@@ -1,100 +1,58 @@
-# RakshakX Email Threat Intelligence Module
+# Email Module
 
-## Overview
+**17 files.** Notification-based email interception, multi-signal threat analysis, and persistence.
 
-The Email Module of RakshakX is a privacy-first, on-device phishing and fraud detection engine designed to intercept malicious email activity before user interaction.
+## Responsibilities
 
-This module performs real-time notification interception and multi-signal threat analysis locally on the Android device without transmitting sensitive user data to external cloud servers.
+- Intercept email notifications from Gmail, Outlook, Yahoo Mail, ProtonMail, and other email clients
+- Run multi-signal analysis: URL reputation, intent/urgency, obfuscation patterns, attachment risk
+- Route high-confidence text to `ScamClassifierRouter` for hybrid ML + rules scoring
+- Persist threats to the email-specific Room DB (`ThreatDatabase`)
+- Contribute to cross-channel correlation via `MultiChannelCorrelationEngine`
 
----
+## Sub-packages
 
-## Core Objectives
+| Package | Purpose |
+|---------|---------|
+| `analyzer/` | Individual signal analyzers: URL, intent, obfuscation, attachment |
+| `database/` | `ThreatDatabase` (Room), `ThreatEntity`, `ThreatDao` |
+| `pipeline/` | `EmailThreatPipeline` — orchestrates analyzers, persists if score ≥ 0.50 |
+| `scoring/` | `ThreatCorrelationEngine` — email-level threat aggregation |
 
-- Detect phishing attempts
-- Identify malicious URLs
-- Analyze social engineering intent
-- Detect obfuscated scam text
-- Identify dangerous attachments
-- Perform explainable risk scoring
-- Maintain privacy through edge processing
+## Key Classes
 
----
-
-## Current Detection Pipeline
-
-Notification
-→ Text Extraction
-→ Text Normalization
-→ Feature Extraction
-→ Risk Scoring
-→ Threat Classification
-
----
+| Class | Purpose |
+|-------|---------|
+| `EmailScamDetector` | Entry point; calls `RakshakXApplication.scamRouter.classify()` and passes result to pipeline |
+| `EmailThreatPipeline` | Writes `ThreatEntity` to DB for high-risk emails; tracks duplicates |
 
 ## Detection Signals
 
-### URL Intelligence
-- Suspicious domains
-- Multi-link detection
-- URL obfuscation patterns
+- **URL analysis** — Suspicious domains, redirect obfuscation, known phishing TLDs
+- **Intent analysis** — Urgency keywords, credential harvesting phrases, financial pressure
+- **Obfuscation** — Homoglyphs, zero-width characters, base64-encoded content, excessive caps
+- **Attachment risk** — APK, executable, and archive attachment indicators in notification text
 
-### Intent Analysis
-- Banking keywords
-- Urgency phrases
-- Social engineering indicators
+## Scoring
 
-### Obfuscation Detection
-- Symbol replacement
-- Excessive capitalization
-- Repeated punctuation
+```
+EmailScamDetector invokes ScamClassifierRouter.classify(text, "email")
+  → finalScore = ML × 0.60 + Rules × 0.40
+  → If finalScore ≥ 0.50: EmailThreatPipeline persists to ThreatDatabase
+  → If finalScore ≥ 0.70: ALERTS_CRITICAL notification channel
+```
 
-### Attachment Risk Analysis
-- APK detection
-- ZIP/RAR detection
-- Executable attachment indicators
+## Supported Email Apps
 
----
+Identified by package name in `RakshakNotificationListenerService`:
+- `com.google.android.gm` (Gmail)
+- `com.microsoft.office.outlook`
+- `com.yahoo.mobile.client.android.mail`
+- `ch.protonmail.android`
+- `me.proton.android.mail`
+- Other mail clients via configurable package list
 
-## Risk Classification
+## Notes
 
-The module aggregates multiple weak signals into a weighted fraud score.
-
-Threat levels:
-- SAFE
-- MEDIUM RISK
-- HIGH RISK
-
----
-
-## Privacy & Edge Intelligence
-
-RakshakX Email Module is designed as an edge-first security system.
-
-Features:
-- On-device processing
-- No cloud inference
-- No external LLM dependency
-- Privacy-preserving architecture
-- Offline-capable threat analysis
-
----
-
-## Future Enhancements
-
-- Gmail API integration
-- TinyML phishing classifier
-- ONNX/TFLite transformer inference
-- OCR attachment scanning
-- Sender reputation analysis
-- Explainable phishing alerts
-
----
-
-## Tech Stack
-
-- Kotlin
-- Android NotificationListenerService
-- Regex-based NLP preprocessing
-- Edge AI architecture
-- TensorFlow Lite (planned)
-- ONNX Runtime Mobile (planned)
+- Gmail API integration is not used — the module is notification-only to preserve privacy
+- The email-specific `ThreatDatabase` is separate from the unified `FraudDao` database; both are SQLCipher-encrypted

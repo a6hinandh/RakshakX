@@ -1,70 +1,130 @@
 package com.security.rakshakx.ui.theme
 
+import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
-/**
- * Extended color palette for RakshakX cybersecurity theme.
- * Accessible via LocalRakshakXColors.current
- */
 data class RakshakXColors(
-    val background: Color = Navy900,
-    val cardBackground: Color = Navy800,
-    val surfaceElevated: Color = Navy700,
-    val surfaceActive: Color = Navy600,
-    val border: Color = Navy500,
-    val primary: Color = PremiumBlue,
-    val primaryVariant: Color = PremiumPurple,
-    val primaryPressed: Color = PremiumBlue.copy(alpha = 0.8f),
-    val teal: Color = PremiumGreen,
-    val tealSecondary: Color = PremiumGreen.copy(alpha = 0.7f),
-    val critical: Color = PremiumRed,
-    val criticalLight: Color = PremiumRed.copy(alpha = 0.8f),
-    val criticalBg: Color = PremiumRed.copy(alpha = 0.1f),
-    val warning: Color = PremiumOrange,
-    val warningLight: Color = PremiumOrange.copy(alpha = 0.8f),
-    val warningBg: Color = PremiumOrange.copy(alpha = 0.1f),
-    val safe: Color = PremiumGreen,
-    val safeLight: Color = PremiumGreen.copy(alpha = 0.8f),
-    val safeBg: Color = PremiumGreen.copy(alpha = 0.1f),
-    val textPrimary: Color = Color.White,
-    val textSecondary: Color = Color.White.copy(alpha = 0.7f),
-    val textMuted: Color = Color.White.copy(alpha = 0.5f),
-    val textOnPrimary: Color = Color.Black,
-    val glowCyan: Color = PremiumBlue.copy(alpha = 0.2f),
-    val glowRed: Color = PremiumRed.copy(alpha = 0.2f),
-    val glowGreen: Color = PremiumGreen.copy(alpha = 0.2f),
-    val glowOrange: Color = PremiumOrange.copy(alpha = 0.2f),
-    val glassBg: Color = Color.White.copy(alpha = 0.1f),
+    // Background hierarchy — deep navy spectrum
+    val background: Color = Charcoal,
+    val backgroundDeep: Color = Obsidian,
+    val cardBackground: Color = Gunmetal,
+    val surfaceElevated: Color = Slate,
+    val surfaceActive: Color = SlateLight,
+    val border: Color = SlateBorder,
+
+    // Brand anchors (for accent lines, brand moments)
+    val brandDeep: Color = NavyDeep,
+    val brandMid: Color = NavyMid,
+    val brandSlate: Color = SlateBlue,
+
+    // CTA / Interactive — Azure
+    val primary: Color = RoyalBlue,
+    val primaryDark: Color = RoyalBlueDark,
+    val primaryLight: Color = RoyalBlueLight,
+    val primaryMuted: Color = RoyalBlueMuted,
+
+    // Secondary accent — Calm Teal (Call channel, secondary UI)
+    val primaryVariant: Color = Amethyst,
+    val primaryVariantDark: Color = AmethystDark,
+    val primaryVariantLight: Color = AmethystLight,
+    val primaryVariantMuted: Color = AmethystMuted,
+
+    // Status: Risk
+    val critical: Color = Crimson,
+    val criticalDark: Color = CrimsonDark,
+    val criticalLight: Color = CrimsonLight,
+    val criticalBg: Color = CrimsonMuted,
+
+    // Status: Caution
+    val warning: Color = Amber,
+    val warningDark: Color = AmberDark,
+    val warningLight: Color = AmberLight,
+    val warningBg: Color = AmberMuted,
+
+    // Status: Safe — Emerald ONLY for confirmed protected states
+    val safe: Color = Emerald,
+    val safeDark: Color = EmeraldDark,
+    val safeLight: Color = EmeraldLight,
+    val safeBg: Color = EmeraldMuted,
+
+    // Warm accent
+    val gold: Color = Gold,
+    val goldLight: Color = GoldLight,
+    val goldMuted: Color = GoldMuted,
+
+    // Text hierarchy
+    val textPrimary: Color = TextWhite,
+    val textSecondary: Color = TextSecondary,
+    val textMuted: Color = TextMuted,
+    val textOnPrimary: Color = TextOnPrimary,
+
+    // Surface overlays (used sparingly)
+    val glassWhite: Color = GlassWhite,
+    val glassBorder: Color = GlassBorder,
+    val glassHighlight: Color = GlassHighlight,
+    val scrim: Color = Scrim,
+
+    // Semantic glow references (minimal use; no full glow effects)
+    val glowCyan: Color = RoyalBlueMuted,
+    val glowRed: Color = CrimsonMuted,
+    val glowGreen: Color = EmeraldMuted,
+    val glowOrange: Color = AmberMuted,
+    val glassBg: Color = GlassWhite,
+
+    // Channel identity colors
+    val channelSms: Color = RoyalBlue,
+    val channelCall: Color = Amethyst,
+    val channelWeb: Color = Emerald,
+    val channelEmail: Color = Crimson,
 )
 
 val LocalRakshakXColors = staticCompositionLocalOf { RakshakXColors() }
 
 private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF4776E6),
-    onPrimary = Color.Black,
-    secondary = Color(0xFF8E54E9),
-    onSecondary = Color.White,
-    tertiary = Color(0xFF4F46E5),
-    background = Color(0xFF0F172A),
-    onBackground = Color.White,
-    surface = Color(0xFF1E293B),
-    onSurface = Color.White,
-    surfaceVariant = Color(0xFF334155),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    error = Color(0xFFEF4444),
-    onError = Color.White,
-    outline = Color(0xFF334155),
-    outlineVariant = Color(0xFF475569),
+    primary = RoyalBlue,
+    onPrimary = TextOnPrimary,
+    secondary = Amethyst,
+    onSecondary = TextWhite,
+    tertiary = Emerald,
+    onTertiary = Obsidian,
+    background = Charcoal,
+    onBackground = TextWhite,
+    surface = Gunmetal,
+    onSurface = TextWhite,
+    surfaceVariant = Slate,
+    onSurfaceVariant = TextSecondary,
+    error = Crimson,
+    onError = TextWhite,
+    outline = SlateBorder,
+    outlineVariant = SlateLight,
+    inverseSurface = TextWhite,
+    inverseOnSurface = Obsidian,
+    scrim = Scrim,
 )
 
 @Composable
 fun RakshakXTheme(content: @Composable () -> Unit) {
     val rakshakXColors = RakshakXColors()
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            window.statusBarColor = Obsidian.toArgb()
+            window.navigationBarColor = Charcoal.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
+        }
+    }
 
     CompositionLocalProvider(LocalRakshakXColors provides rakshakXColors) {
         MaterialTheme(

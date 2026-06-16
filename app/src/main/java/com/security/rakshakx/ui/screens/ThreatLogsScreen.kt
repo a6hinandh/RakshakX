@@ -1,10 +1,12 @@
 package com.security.rakshakx.ui.screens
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -14,20 +16,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.security.rakshakx.ui.anim.ShimmerPlaceholder
+import com.security.rakshakx.ui.anim.rememberHaptics
 import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.data.*
 import com.security.rakshakx.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.Color
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ThreatLogsScreen() {
     val colors = LocalRakshakXColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptics = rememberHaptics()
 
     var threats by remember { mutableStateOf<List<ThreatLogEntry>>(emptyList()) }
     var selectedChannel by remember { mutableStateOf<Channel?>(null) }
@@ -50,38 +52,26 @@ fun ThreatLogsScreen() {
         channelMatch && searchMatch
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(Color(0xFF0F172A), Color(0xFF1E293B))
-                )
-            )
-    ) {
+    PremiumBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp)
+                .statusBarsPadding()
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        "Verified Threats",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = Color.White
-                    )
+                    Text("Threat Log", style = MaterialTheme.typography.headlineLarge, color = colors.textPrimary)
                     Text(
                         "${threats.size} events across all channels",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.6f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textMuted
                     )
                 }
                 IconButton(
@@ -93,129 +83,120 @@ fun ThreatLogsScreen() {
                         }
                     }
                 ) {
-                    Icon(Icons.Filled.Refresh, "Refresh", tint = Color.White)
+                    Icon(Icons.Filled.Refresh, "Refresh", tint = colors.textSecondary)
                 }
             }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        // Search bar
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search threats...", color = colors.textMuted) },
-            leadingIcon = { Icon(Icons.Filled.Search, null, tint = colors.textMuted) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.medium,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = colors.primary,
-                unfocusedBorderColor = colors.border,
-                focusedContainerColor = colors.cardBackground,
-                unfocusedContainerColor = colors.cardBackground,
-                focusedTextColor = colors.textPrimary,
-                unfocusedTextColor = colors.textPrimary,
-                cursorColor = colors.primary,
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Search threats...", color = colors.textMuted) },
+                leadingIcon = { Icon(Icons.Filled.Search, null, tint = colors.textMuted) },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colors.primary,
+                    unfocusedBorderColor = colors.border.copy(alpha = 0.3f),
+                    focusedContainerColor = Gunmetal,
+                    unfocusedContainerColor = Gunmetal,
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary,
+                    cursorColor = colors.primary,
+                )
             )
-        )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        // Channel filter chips
-        androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(end = 20.dp) // Extra padding for the last item
-        ) {
-            item {
-                FilterChip(
-                    selected = selectedChannel == null,
-                    onClick = { selectedChannel = null },
-                    label = { Text("All", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color.White.copy(alpha = 0.1f),
-                        selectedLabelColor = Color.White,
-                        containerColor = Color.White.copy(alpha = 0.02f),
-                        labelColor = Color.White.copy(alpha = 0.5f)
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        borderColor = Color.White.copy(alpha = 0.05f),
-                        selectedBorderColor = Color.White.copy(alpha = 0.2f),
-                        enabled = true,
-                        selected = selectedChannel == null
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-            items(Channel.entries.toList()) { channel ->
-                val accentColor = when (channel) {
-                    Channel.SMS -> Color(0xFF4776E6)
-                    Channel.CALL -> Color(0xFF8E54E9)
-                    Channel.WEB -> Color(0xFF10B981)
-                    Channel.EMAIL -> Color(0xFFEF4444)
-                }
-                FilterChip(
-                    selected = selectedChannel == channel,
-                    onClick = { selectedChannel = if (selectedChannel == channel) null else channel },
-                    label = { Text(channel.label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) },
-                    leadingIcon = {
-                        Icon(channel.icon, null, modifier = Modifier.size(16.dp),
-                            tint = if (selectedChannel == channel) accentColor else Color.White.copy(alpha = 0.3f))
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = accentColor.copy(alpha = 0.15f),
-                        selectedLabelColor = accentColor,
-                        containerColor = Color.White.copy(alpha = 0.02f),
-                        labelColor = Color.White.copy(alpha = 0.5f)
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        borderColor = Color.White.copy(alpha = 0.05f),
-                        selectedBorderColor = accentColor.copy(alpha = 0.3f),
-                        enabled = true,
-                        selected = selectedChannel == channel
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Threat list
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = colors.primary)
-            }
-        } else if (filteredThreats.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Filled.VerifiedUser, null, tint = colors.safe, modifier = Modifier.size(48.dp))
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("No Threats Found", style = MaterialTheme.typography.titleMedium, color = colors.safe)
-                    Text(
-                        if (searchQuery.isNotBlank()) "No results for \"$searchQuery\""
-                        else "All channels are clear",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textMuted
+                item {
+                    FilterChip(
+                        selected = selectedChannel == null,
+                        onClick = { haptics.tick(); selectedChannel = null },
+                        label = { Text("All", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = colors.primaryMuted,
+                            selectedLabelColor = colors.primary,
+                            containerColor = colors.surfaceElevated,
+                            labelColor = colors.textMuted
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = colors.border.copy(alpha = 0.3f),
+                            selectedBorderColor = colors.primary.copy(alpha = 0.2f),
+                            enabled = true,
+                            selected = selectedChannel == null
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+                items(Channel.entries.toList()) { channel ->
+                    FilterChip(
+                        selected = selectedChannel == channel,
+                        onClick = { haptics.tick(); selectedChannel = if (selectedChannel == channel) null else channel },
+                        label = { Text(channel.label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold) },
+                        leadingIcon = {
+                            Icon(channel.icon, null, modifier = Modifier.size(14.dp),
+                                tint = if (selectedChannel == channel) channel.color else colors.textMuted)
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = channel.color.copy(alpha = 0.1f),
+                            selectedLabelColor = channel.color,
+                            containerColor = colors.surfaceElevated,
+                            labelColor = colors.textMuted
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = colors.border.copy(alpha = 0.3f),
+                            selectedBorderColor = channel.color.copy(alpha = 0.2f),
+                            enabled = true,
+                            selected = selectedChannel == channel
+                        ),
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
             }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(bottom = 100.dp)
-            ) {
-                items(filteredThreats, key = { it.id }) { entry ->
-                    ThreatCard(entry = entry)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (isLoading) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    repeat(4) { ShimmerPlaceholder(height = 90.dp) }
                 }
-                item {
-                    RakshakXFooter()
+            } else if (filteredThreats.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Filled.VerifiedUser, null, tint = colors.safe.copy(alpha = 0.4f), modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("All Clear", style = MaterialTheme.typography.titleLarge, color = colors.safe)
+                        Text(
+                            if (searchQuery.isNotBlank()) "No results for \"$searchQuery\"" else "No threats detected",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textMuted
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 100.dp)
+                ) {
+                    items(filteredThreats, key = { it.id }) { entry ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 6 }
+                        ) {
+                            ThreatCard(entry = entry)
+                        }
+                    }
+                    item { RakshakXFooter() }
                 }
             }
-        }
         }
     }
 }

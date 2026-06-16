@@ -104,14 +104,16 @@ class UrlScanActivity : ComponentActivity() {
                     
                     // ── Multi-Channel Correlation ────────────────────────────
                     val correlation = correlationEngine.correlateUrlWithRecentSms(url)
-                    
+                        ?: correlationEngine.correlateWebWithRecentEmail(url)
+
                     if (correlation != null) {
                         Log.i("UrlScanActivity", "Correlation found: ${correlation.reason}")
                         hapticManager.triggerStrongWarning()
                         // Force critical status if correlated
+                        val sourceInfo = correlation.sourceSms?.sender ?: correlation.sourceEmail?.senderEmail ?: "unknown"
                         finalAssessment = result.copy(
                             level = ThreatLevel.CRITICAL,
-                            reasons = result.reasons + "Linked to suspicious SMS: ${correlation.sourceSms.sender}"
+                            reasons = result.reasons + "Linked to suspicious ${correlation.type.category}: $sourceInfo"
                         )
                     }
                     

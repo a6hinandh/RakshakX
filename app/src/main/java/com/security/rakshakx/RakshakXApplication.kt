@@ -66,6 +66,9 @@ class RakshakXApplication : Application() {
 
         // DO NOT call callStateMonitor?.start() here.
         // Start it from an Activity after READ_PHONE_STATE is granted.
+
+        // ── Security Digest Scheduler ───────────────────────────────────
+        com.security.rakshakx.notifications.SecurityDigestWorker.scheduleDaily(this)
     }
 
     override fun onTerminate() {

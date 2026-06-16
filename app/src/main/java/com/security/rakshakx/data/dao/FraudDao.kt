@@ -19,6 +19,12 @@ interface FraudDao {
     @Query("SELECT * FROM sms_events WHERE detectedUrls LIKE '%' || :url || '%' AND timestamp > :since ORDER BY timestamp DESC")
     suspend fun findRecentSmsWithUrl(url: String, since: Long): List<SmsEventEntity>
 
+    @Query("SELECT * FROM sms_events WHERE sender LIKE '%' || :phone || '%' AND timestamp > :since ORDER BY timestamp DESC")
+    suspend fun findRecentSmsByPhone(phone: String, since: Long): List<SmsEventEntity>
+
+    @Query("SELECT * FROM sms_events WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun findSmsInTimeRange(start: Long, end: Long): List<SmsEventEntity>
+
     // CALL
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCall(event: CallEventEntity): Long
@@ -26,12 +32,27 @@ interface FraudDao {
     @Query("SELECT * FROM call_events ORDER BY timestamp DESC")
     fun getAllCalls(): Flow<List<CallEventEntity>>
 
+    @Query("SELECT * FROM call_events ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getAllCallsList(limit: Int): List<CallEventEntity>
+
+    @Query("SELECT * FROM call_events WHERE phoneNumber LIKE '%' || :phone || '%' AND timestamp > :since ORDER BY timestamp DESC")
+    suspend fun findRecentCallsByPhone(phone: String, since: Long): List<CallEventEntity>
+
+    @Query("SELECT * FROM call_events WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun findCallsInTimeRange(start: Long, end: Long): List<CallEventEntity>
+
     // EMAIL
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEmail(event: EmailEventEntity): Long
 
     @Query("SELECT * FROM email_events ORDER BY timestamp DESC")
     fun getAllEmails(): Flow<List<EmailEventEntity>>
+
+    @Query("SELECT * FROM email_events ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getAllEmailsList(limit: Int): List<EmailEventEntity>
+
+    @Query("SELECT * FROM email_events WHERE timestamp BETWEEN :start AND :end ORDER BY timestamp DESC")
+    suspend fun findEmailsInTimeRange(start: Long, end: Long): List<EmailEventEntity>
 
     // WEB
     @Insert(onConflict = OnConflictStrategy.REPLACE)

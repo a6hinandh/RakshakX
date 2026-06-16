@@ -2,10 +2,13 @@ package com.security.rakshakx.call.callanalysis
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 
 class VoskTranscriber(
@@ -196,6 +199,64 @@ class VoskTranscriber(
                 e
             )
 
+            ""
+        }
+    }
+
+    fun isModelAvailable(): Boolean {
+        return try {
+            val assets = context.assets.list(MODEL_DIR)
+            !assets.isNullOrEmpty()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    suspend fun transcribe(audioPath: String): String = withContext(Dispatchers.IO) {
+        try {
+            val audioFile = File(audioPath)
+            if (!audioFile.exists()) {
+                Log.e("RAKSHAK_DEBUG", "Audio file not found: $audioPath")
+                return@withContext ""
+            }
+
+            if (!initialize()) {
+                Log.e("RAKSHAK_DEBUG", "Failed to initialize Vosk for file transcription")
+                return@withContext ""
+            }
+
+            val tempRecognizer = Recognizer(model!!, 16000.0f).apply { setWords(true) }
+            val buffer = ByteArray(4096)
+            val fullText = StringBuilder()
+
+            FileInputStream(audioFile).use { fis ->
+                // Skip WAV header if present
+                if (audioPath.endsWith(".wav", ignoreCase = true)) {
+                    fis.skip(44)
+                }
+                var bytesRead: Int
+                while (fis.read(buffer).also { bytesRead = it } != -1) {
+                    if (tempRecognizer.acceptWaveForm(buffer, bytesRead)) {
+                        val result = JSONObject(tempRecognizer.result).optString("text", "")
+                        if (result.isNotBlank()) {
+                            if (fullText.isNotEmpty()) fullText.append(" ")
+                            fullText.append(result)
+                        }
+                    }
+                }
+            }
+
+            val finalResult = JSONObject(tempRecognizer.finalResult).optString("text", "")
+            if (finalResult.isNotBlank()) {
+                if (fullText.isNotEmpty()) fullText.append(" ")
+                fullText.append(finalResult)
+            }
+
+            tempRecognizer.close()
+            Log.d("RAKSHAK_DEBUG", "File transcription complete: ${fullText.length} chars")
+            fullText.toString()
+        } catch (e: Exception) {
+            Log.e("RAKSHAK_DEBUG", "File transcription failed", e)
             ""
         }
     }

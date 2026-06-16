@@ -56,7 +56,7 @@
              ════════════════════════════════════════════════════════════ -->
 
         <activity
-            android:name=".onboarding.OnboardingActivity"
+            android:name=".SplashActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.RakshakX">
@@ -65,6 +65,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".onboarding.OnboardingActivity"
+            android:exported="false"
+            android:theme="@style/Theme.RakshakX" />
 
         <activity
             android:name=".MainActivity"
@@ -253,6 +258,18 @@
         <receiver
             android:name=".notifications.receivers.NotificationActionReceiver"
             android:exported="false" />
+
+        <!-- Home Screen Widget -->
+        <receiver
+            android:name=".widget.SecurityWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_security_info" />
+        </receiver>
 
     </application>
 

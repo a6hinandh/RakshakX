@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="RAKSHAKX"
+        android:textColor="#6B7A94"
+        android:textSize="9sp"
+        android:letterSpacing="0.15"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvWidgetScore"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="90"
+        android:textColor="#3B6DE6"
+        android:textSize="36sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvWidgetStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="All Channels Active"
+        android:textColor="#E8EDF5"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/tvWidgetChannels"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="SMS CALL EMAIL WEB"
+        android:textColor="#6B7A94"
+        android:textSize="9sp"
+        android:letterSpacing="0.1" />
+
+</LinearLayout>

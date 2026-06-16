@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">రక్షక్ ఎక్స్</string>
+    <string name="call_analyze">విశ్లేషణ</string>
+    <string name="call_simulate_fraud_call">మోసం కాల్ అనుకరించు</string>
+</resources>

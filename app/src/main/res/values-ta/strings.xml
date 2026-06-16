@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ரக்ஷக் எக்ஸ்</string>
+    <string name="call_analyze">பகுப்பாய்வு</string>
+    <string name="call_simulate_fraud_call">மோசடி அழைப்பை உருவகப்படுத்து</string>
+</resources>

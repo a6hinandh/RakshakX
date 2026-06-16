@@ -61,9 +61,25 @@ class RakshakNotificationListenerService : NotificationListenerService() {
             "com.readdle.spark"
         )
 
+        val MESSAGING_PACKAGES = setOf(
+            "com.whatsapp",
+            "com.whatsapp.w4b",
+            "org.telegram.messenger",
+            "org.thunderdog.chalern",
+            "org.thoughtcrime.securesms",
+            "com.Slack",
+            "com.facebook.orca",
+            "com.instagram.android"
+        )
+
         private const val OWN_PACKAGE = "com.security.rakshakx"
 
         private val EMAIL_IN_TEXT = Regex("\\S+@\\S+\\.\\S+")
+        private val UPI_PATTERN = Regex("""upi://pay\?[^\s]+|[a-zA-Z0-9._-]+@[a-zA-Z]+""", RegexOption.IGNORE_CASE)
+        private val UPI_COLLECT_INDICATORS = listOf(
+            "collect request", "payment request", "pay request",
+            "collect money", "request money", "sent you a request"
+        )
     }
 
     /** Sender / subject / snippet inferred from [Notification.extras] (varies by OEM and mail app). */
@@ -156,7 +172,14 @@ class RakshakNotificationListenerService : NotificationListenerService() {
                 val ingress = extractEmailIngress(extras, pkg, title, body)
                 handleEmailNotification(pkg, ingress)
             }
-            else -> Log.d(TAG, "Ignoring notification from non-SMS/non-email package: $pkg")
+            isMessagingAppPackage(pkg) -> {
+                if (!settings.smsEnabled.value) {
+                    Log.d(TAG, "SMS/Messaging protection disabled. Ignoring.")
+                    return
+                }
+                handleMessagingNotification(pkg, title, body)
+            }
+            else -> Log.d(TAG, "Ignoring notification from package: $pkg")
         }
     }
 
@@ -255,6 +278,76 @@ class RakshakNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    private fun handleMessagingNotification(pkg: String, title: String, body: String) {
+        Log.d(TAG, "Processing messaging notification from: $pkg")
+        if (!SmsDeduplicationGuard.shouldProcess(this, title, body)) {
+            Log.d(TAG, "Skipping duplicate messaging event")
+            return
+        }
+
+        coroutineScope.launch {
+            try {
+                val appName = when {
+                    pkg.contains("whatsapp") -> "WhatsApp"
+                    pkg.contains("telegram") -> "Telegram"
+                    pkg.contains("signal") || pkg == "org.thoughtcrime.securesms" -> "Signal"
+                    else -> "Messaging"
+                }
+
+                val result = SmsScamDetector(this@RakshakNotificationListenerService)
+                    .analyze(sender = "$title ($appName)", body = body)
+
+                val upiAlerts = detectUpiThreats(body)
+                if (upiAlerts.isNotEmpty()) {
+                    val upiScore = 75
+                    SmsFraudNotifications.showFraudAlert(
+                        context = this@RakshakNotificationListenerService,
+                        sender = "$title ($appName)",
+                        message = "UPI threat: ${upiAlerts.joinToString("; ")}\n\n$body",
+                        riskScore = upiScore,
+                        source = appName
+                    )
+                }
+
+                val isForwarded = body.contains("forwarded", ignoreCase = true) ||
+                    body.contains("Forwarded many times", ignoreCase = true)
+                if (isForwarded && result.finalScore > 0.2f) {
+                    Log.i(TAG, "Forwarded message flagged with risk ${result.finalScore}")
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to process messaging notification", e)
+            }
+        }
+    }
+
+    private fun detectUpiThreats(text: String): List<String> {
+        val threats = mutableListOf<String>()
+        val lower = text.lowercase()
+
+        if (UPI_COLLECT_INDICATORS.any { lower.contains(it) }) {
+            threats.add("Suspicious UPI collect request detected")
+        }
+
+        val upiMatches = UPI_PATTERN.findAll(text)
+        for (match in upiMatches) {
+            val upiId = match.value
+            if (upiId.startsWith("upi://")) {
+                threats.add("UPI payment deep link found: ${upiId.take(50)}")
+            }
+        }
+
+        val fakeUpiKeywords = listOf(
+            "send money", "transfer now", "pay immediately", "pending payment",
+            "पैसे भेजो", "तुरंत भुगतान करो", "ಹಣ ಕಳುಹಿಸಿ", "பணம் அனுப்பு"
+        )
+        if (fakeUpiKeywords.any { lower.contains(it) }) {
+            threats.add("Urgency-based payment request detected")
+        }
+
+        return threats
+    }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification) { /* no-op */ }
 
     private fun isSmsAppPackage(packageName: String): Boolean =
@@ -262,4 +355,9 @@ class RakshakNotificationListenerService : NotificationListenerService() {
 
     private fun isEmailAppPackage(packageName: String): Boolean =
         packageName in EMAIL_PACKAGES || packageName.contains("email") || packageName.contains("mail")
+
+    private fun isMessagingAppPackage(packageName: String): Boolean =
+        packageName in MESSAGING_PACKAGES ||
+        packageName.contains("whatsapp") ||
+        packageName.contains("telegram")
 }

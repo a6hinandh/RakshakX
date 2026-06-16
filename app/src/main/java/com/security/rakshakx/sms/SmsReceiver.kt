@@ -6,6 +6,10 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import com.security.rakshakx.core.SettingsStore
+import com.security.rakshakx.core.correlation.MultiChannelCorrelationEngine
+import com.security.rakshakx.notifications.SmsFraudNotifications
+import com.security.rakshakx.call.core.storage.DatabaseFactory
+import com.security.rakshakx.data.entities.SmsEventEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -56,6 +60,7 @@ class SmsReceiver : BroadcastReceiver() {
 
                     // ── Fraud Notification ───────────────────────────────────
                     if (result.isScam) {
+                        RiskEngine.recordFlaggedSender(context, sender)
                         val score0to100 = result.ruleScore.takeIf { it > 0 }
                             ?: (result.finalScore * 100f).toInt().coerceIn(0, 100)
                         SmsFraudNotifications.showFraudAlert(
@@ -69,9 +74,9 @@ class SmsReceiver : BroadcastReceiver() {
 
                     // ── Log to Database for Correlation ──────────────────────
                     try {
-                        val db = com.security.rakshakx.call.core.storage.DatabaseFactory.getInstance(context)
+                        val db = DatabaseFactory.getInstance(context)
                         val urls = extractUrls(body)
-                        val entity = com.security.rakshakx.data.entities.SmsEventEntity(
+                        val entity = SmsEventEntity(
                             sender = sender,
                             messageBody = body,
                             fraudRiskScore = result.finalScore,
@@ -79,8 +84,21 @@ class SmsReceiver : BroadcastReceiver() {
                             containsOtp = body.lowercase().contains("otp"),
                             detectedKeywords = result.label
                         )
-                        db.fraudDao().insertSms(entity)
+                        val smsId = db.fraudDao().insertSms(entity)
                         Log.d(TAG, "Logged SMS to DB for correlation: ${entity.sender}")
+
+                        if (result.isScam) {
+                            try {
+                                val engine = MultiChannelCorrelationEngine(context)
+                                val savedEntity = entity.copy(id = smsId)
+                                val correlations = engine.correlateSmsEvent(savedEntity)
+                                for (corr in correlations) {
+                                    Log.i(TAG, "Cross-channel correlation: ${corr.reason}")
+                                }
+                            } catch (corrError: Exception) {
+                                Log.e(TAG, "Correlation check failed", corrError)
+                            }
+                        }
                     } catch (dbError: Exception) {
                         Log.e(TAG, "Failed to log SMS to DB", dbError)
                     }

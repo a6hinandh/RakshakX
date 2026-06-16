@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ರಕ್ಷಕ್ ಎಕ್ಸ್</string>
+    <string name="call_analyze">ವಿಶ್ಲೇಷಣೆ</string>
+    <string name="call_simulate_fraud_call">ಫ್ರಾಡ್ ಕಾಲ್ ಅನುಕರಿಸಿ</string>
+</resources>
