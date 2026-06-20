@@ -28,6 +28,9 @@ class RakshakXApplication : Application() {
     companion object {
         private const val TAG = "RakshakXApplication"
 
+        lateinit var instance: RakshakXApplication
+            private set
+
         // Global singleton router — all channel detectors use this
         var scamRouter: ScamClassifierRouter? = null
             private set
@@ -35,6 +38,7 @@ class RakshakXApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         Log.d(TAG, "Application onCreate")
 
         // ── ScamClassifierRouter (DistilBERT + IndicBERT) ────────────────────

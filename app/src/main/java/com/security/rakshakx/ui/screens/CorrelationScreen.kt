@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
 import com.security.rakshakx.ui.anim.StaggeredEntry
 import com.security.rakshakx.ui.anim.rememberHaptics
 import com.security.rakshakx.ui.components.*
@@ -23,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-fun CorrelationScreen() {
+fun CorrelationScreen(onBack: () -> Unit = {}) {
     val colors = LocalRakshakXColors.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -53,30 +54,26 @@ fun CorrelationScreen() {
 
     PremiumBackground {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Timeline", style = MaterialTheme.typography.headlineLarge, color = colors.textPrimary)
-                    Text("Cross-channel attack correlation", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-                }
-                IconButton(onClick = {
-                    scope.launch(Dispatchers.IO) {
-                        val threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
-                        if (threats.isNotEmpty()) {
-                            realEvents = threats.sortedBy { it.timestamp }.map { entry ->
-                                CorrelationEvent(entry.id, entry.channel, entry.severity, entry.title, entry.description, entry.timestamp, entry.riskScore)
+            PageHeader(
+                title = "Timeline",
+                infoText = "View cross-channel attack correlation timeline showing how threats escalate across SMS, Call, Web, and Email.",
+                onBack = { haptics.tick(); onBack() },
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                trailing = {
+                    IconButton(onClick = {
+                        scope.launch(Dispatchers.IO) {
+                            val threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
+                            if (threats.isNotEmpty()) {
+                                realEvents = threats.sortedBy { it.timestamp }.map { entry ->
+                                    CorrelationEvent(entry.id, entry.channel, entry.severity, entry.title, entry.description, entry.timestamp, entry.riskScore)
+                                }
                             }
                         }
+                    }) {
+                        Icon(Icons.Filled.Refresh, "Refresh", tint = colors.textSecondary)
                     }
-                }) {
-                    Icon(Icons.Filled.Refresh, "Refresh", tint = colors.textSecondary)
                 }
-            }
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),

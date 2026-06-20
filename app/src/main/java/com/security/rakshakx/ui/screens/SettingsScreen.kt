@@ -1,10 +1,14 @@
 package com.security.rakshakx.ui.screens
 
 import android.app.Activity
+import android.content.ComponentName
+import android.content.Intent
 import android.net.VpnService
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +32,11 @@ import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.theme.*
 import com.security.rakshakx.web.services.FraudVpnService
 import com.security.rakshakx.web.utils.VpnStatusStore
+import com.security.rakshakx.ui.data.ThreatLogRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.security.rakshakx.core.modelupdate.ModelUpdateManager
+import com.security.rakshakx.core.correlation.MitreAttackMapper
 
 @Composable
 fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
@@ -35,20 +44,49 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
     val colors = LocalRakshakXColors.current
     val haptics = rememberHaptics()
     val settingsStore = remember { SettingsStore.getInstance(context) }
+    val scope = rememberCoroutineScope()
 
-    val smsEnabled by settingsStore.smsEnabled.collectAsState()
-    val callEnabled by settingsStore.callEnabled.collectAsState()
-    val emailEnabled by settingsStore.emailEnabled.collectAsState()
     val sensitivity by settingsStore.sensitivity.collectAsState()
     val autoDeleteDays by settingsStore.autoDeleteDays.collectAsState()
-    val vpnRunning by VpnStatusStore.isRunning.collectAsState()
 
-    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            FraudVpnService.start(activity.applicationContext)
-            settingsStore.setWebEnabled(true)
+    val modelUpdateManager = remember { ModelUpdateManager.getInstance(context) }
+    val modelVersion by modelUpdateManager.currentModelVersion.collectAsState()
+    val ruleVersion by modelUpdateManager.currentRuleVersion.collectAsState()
+
+    val packageInfo = remember {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+        } catch (_: Exception) {
+            null
         }
     }
+    val appVersionName = packageInfo?.versionName ?: "1.0"
+    val appVersionCode = packageInfo?.let {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            it.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            it.versionCode.toLong()
+        }
+    } ?: 1L
+
+    val nlsEnabled = remember {
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        flat?.contains(context.packageName) == true
+    }
+    val accessibilityEnabled = remember {
+        try {
+            val comp = ComponentName(context, "com.security.rakshakx.web.services.AccessibilityMonitorService")
+            val enabled = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+            enabled?.contains(comp.flattenToString()) == true
+        } catch (_: Exception) { false }
+    }
+    val vpnRunning by VpnStatusStore.isRunning.collectAsState()
 
     PremiumBackground {
         Column(
@@ -61,19 +99,11 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { haptics.tick(); onBack() },
-                    modifier = Modifier.size(40.dp).background(colors.surfaceElevated, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
-                }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column {
-                    Text("Settings", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary, fontWeight = FontWeight.Bold)
-                    Text("Configure protection preferences", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-                }
-            }
+            PageHeader(
+                title = "Settings",
+                infoText = "Configure detection sensitivity, data retention, system access permissions, and manage your app data.",
+                onBack = { haptics.tick(); onBack() }
+            )
 
             // ── Detection Sensitivity ──
             SectionHeader(title = "Detection Sensitivity")
@@ -106,18 +136,6 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
             }
 
-            // ── Channel Toggles ──
-            SectionHeader(title = "Channel Monitoring")
-            SettingsToggleItem(Icons.Filled.Sms, "SMS Shield", "Real-time SMS fraud interception", smsEnabled, { settingsStore.setSmsEnabled(it) }, colors.channelSms)
-            SettingsToggleItem(Icons.Filled.Call, "Call Shield", "Live call voice pattern analysis", callEnabled, { settingsStore.setCallEnabled(it) }, colors.channelCall)
-            SettingsToggleItem(Icons.Filled.Language, "Web Shield", "VPN-based phishing URL filter", vpnRunning, { enable ->
-                if (enable) {
-                    val intent = VpnService.prepare(activity)
-                    if (intent != null) vpnLauncher.launch(intent) else { FraudVpnService.start(activity.applicationContext); settingsStore.setWebEnabled(true) }
-                } else { FraudVpnService.stop(activity.applicationContext); settingsStore.setWebEnabled(false) }
-            }, colors.channelWeb)
-            SettingsToggleItem(Icons.Filled.Email, "Email Shield", "Notification-level email analysis", emailEnabled, { settingsStore.setEmailEnabled(it) }, colors.channelEmail)
-
             // ── Data Retention ──
             SectionHeader(title = "Data Retention")
             GlassCard {
@@ -127,7 +145,13 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
                     listOf(7, 14, 30, 90).forEach { days ->
                         FilterChip(
                             selected = autoDeleteDays == days,
-                            onClick = { haptics.tick(); settingsStore.setAutoDeleteDays(days) },
+                            onClick = {
+                                haptics.tick()
+                                settingsStore.setAutoDeleteDays(days)
+                                scope.launch(Dispatchers.IO) {
+                                    ThreatLogRepository.cleanOldLogs(context, days)
+                                }
+                            },
                             label = { Text("${days}d") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = colors.primaryMuted,
@@ -141,21 +165,163 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
                 }
             }
 
+            // ── System Access ──
+            SectionHeader(title = "System Access")
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ClickablePermissionRow(
+                        icon = Icons.Filled.Notifications,
+                        title = "Notification Listener",
+                        desc = "Required for SMS and email interception",
+                        active = nlsEnabled,
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                            } catch (_: Exception) {}
+                        }
+                    )
+                    
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.2f))
+                    
+                    ClickablePermissionRow(
+                        icon = Icons.Filled.Accessibility,
+                        title = "Accessibility Service",
+                        desc = "Browser session monitoring for web protection",
+                        active = accessibilityEnabled,
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            } catch (_: Exception) {}
+                        }
+                    )
+                    
+                    HorizontalDivider(color = colors.border.copy(alpha = 0.2f))
+                    
+                    ClickablePermissionRow(
+                        icon = Icons.Filled.VpnLock,
+                        title = "VPN Service",
+                        desc = "DNS-level threat blocking layer",
+                        active = vpnRunning,
+                        onClick = {
+                            try {
+                                context.startActivity(Intent("android.settings.VPN_SETTINGS"))
+                            } catch (_: Exception) {}
+                        }
+                    )
+                }
+            }
+
+            // ── Database Security ──
+            SectionHeader(title = "Database Security")
+            GlassCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Encrypted Threat Database",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "All threat events stored with SQLCipher AES-256. No cloud sync.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textMuted
+                        )
+                    }
+                    StatusChip("Secure", colors.safe)
+                }
+            }
+
+            // ── Storage & Reset ──
+            SectionHeader(title = "Storage & Reset")
+            GlassCard(borderColor = colors.critical.copy(alpha = 0.12f)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Delete Application Data",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colors.critical,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "This will permanently delete all threat logs, call transcripts, saved scan results, and reset all app preferences to default.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textMuted
+                    )
+                    
+                    var showConfirmDialog by remember { mutableStateOf(false) }
+                    
+                    Button(
+                        onClick = { haptics.tick(); showConfirmDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.critical.copy(alpha = 0.15f), contentColor = colors.critical),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Delete, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete All Local Data", fontWeight = FontWeight.Bold)
+                    }
+                    
+                    if (showConfirmDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showConfirmDialog = false },
+                            title = { Text("Confirm Data Deletion") },
+                            text = { Text("Are you absolutely sure? This action is permanent and cannot be undone.") },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        showConfirmDialog = false
+                                        scope.launch {
+                                            settingsStore.clearAllData(context)
+                                        }
+                                    }
+                                ) {
+                                    Text("Delete Everything", color = colors.critical, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showConfirmDialog = false }) {
+                                    Text("Cancel", color = colors.textMuted)
+                                }
+                            },
+                            containerColor = colors.cardBackground,
+                            titleContentColor = colors.textPrimary,
+                            textContentColor = colors.textSecondary
+                        )
+                    }
+                }
+            }
+
             // ── About ──
             SectionHeader(title = "About")
             GlassCard(borderColor = colors.gold.copy(alpha = 0.12f)) {
                 Text("RakshakX", style = MaterialTheme.typography.headlineSmall, color = colors.gold, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    "Privacy-first AI guardian that intercepts scams across calls, SMS, email, and web. " +
-                    "All analysis runs on-device — your data never leaves your phone.",
+                    "Privacy-preserving mobile endpoint protection utilizing on-device NLP classifiers, " +
+                    "local speech-to-text transcription, DNS-level VPN sinkholing, and cross-channel " +
+                    "threat correlation to defend against zero-day social engineering and network attacks " +
+                    "without cloud telemetry.",
                     style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.border.copy(alpha = 0.3f))
-                Spacer(modifier = Modifier.height(10.dp))
-                Text("Version 2.0.0 • On-Device Neural Engine", style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
-                Text("Developed by InnovateX", style = MaterialTheme.typography.labelLarge, color = colors.primaryVariant)
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                AboutDetailRow(label = "App Version", value = "$appVersionName ($appVersionCode)")
+                AboutDetailRow(label = "On-Device AI Model", value = "v$modelVersion")
+                AboutDetailRow(label = "Rule Signature Engine", value = "v$ruleVersion")
+                AboutDetailRow(label = "MITRE ATT&CK Mappings", value = "${MitreAttackMapper.getAllTechniques().size} Techniques Mapped")
+                AboutDetailRow(label = "Threat Database", value = "SQLCipher AES-256")
+                AboutDetailRow(label = "Developer", value = "InnovateX")
             }
 
             RakshakXFooter()
@@ -164,45 +330,87 @@ fun SettingsScreen(activity: Activity, onBack: () -> Unit) {
 }
 
 @Composable
-private fun SettingsToggleItem(
+private fun ClickablePermissionRow(
     icon: ImageVector,
     title: String,
-    description: String,
-    isChecked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    iconColor: Color
+    desc: String,
+    active: Boolean,
+    onClick: () -> Unit
 ) {
     val colors = LocalRakshakXColors.current
     val haptics = rememberHaptics()
-    GlassSurface {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                haptics.tick()
+                onClick()
+            }
+            .padding(vertical = 8.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (active) colors.safe else colors.critical,
+            modifier = Modifier.size(20.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
+            Text(desc, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+        }
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Box(
-                modifier = Modifier.size(40.dp).background(iconColor.copy(alpha = 0.08f), RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center
+                modifier = Modifier
+                    .background(
+                        if (active) colors.safe.copy(alpha = 0.12f) else colors.critical.copy(alpha = 0.1f),
+                        RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
             ) {
-                Icon(icon, null, tint = iconColor, modifier = Modifier.size(20.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                Text(description, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-            }
-            Switch(
-                checked = isChecked,
-                onCheckedChange = { enabled ->
-                    if (enabled) haptics.toggleOn() else haptics.toggleOff()
-                    onCheckedChange(enabled)
-                },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = TextWhite,
-                    checkedTrackColor = iconColor,
-                    uncheckedThumbColor = TextMuted,
-                    uncheckedTrackColor = colors.border
+                Text(
+                    text = if (active) "ACTIVE" else "INACTIVE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (active) colors.safe else colors.critical,
+                    fontWeight = FontWeight.Bold
                 )
+            }
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = colors.textMuted,
+                modifier = Modifier.size(16.dp)
             )
         }
     }
 }
+
+@Composable
+private fun AboutDetailRow(label: String, value: String) {
+    val colors = LocalRakshakXColors.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textMuted,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textPrimary,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.security.rakshakx.core.family.FamilyMember
@@ -22,6 +23,7 @@ import com.security.rakshakx.core.family.FamilyRole
 import com.security.rakshakx.ui.anim.rememberHaptics
 import com.security.rakshakx.ui.components.*
 import com.security.rakshakx.ui.theme.*
+import java.util.UUID
 
 @Composable
 fun FamilyProtectionScreen(onBack: () -> Unit) {
@@ -33,7 +35,8 @@ fun FamilyProtectionScreen(onBack: () -> Unit) {
     val isEnabled by manager.isEnabled.collectAsState()
     val simplifiedUi by manager.simplifiedUi.collectAsState()
     val userRole by manager.userRole.collectAsState()
-    val members = remember(isEnabled) { manager.getMembers() }
+    var members by remember { mutableStateOf(manager.getMembers()) }
+    var showAddMemberDialog by remember { mutableStateOf(false) }
 
     PremiumBackground {
         Column(
@@ -46,17 +49,41 @@ fun FamilyProtectionScreen(onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { haptics.tick(); onBack() },
-                    modifier = Modifier.size(40.dp).background(colors.surfaceElevated, RoundedCornerShape(12.dp))
+            PageHeader(
+                title = "Family Protection",
+                infoText = "Preview family protection features with local profiles and simplified UI for family members.",
+                onBack = { haptics.tick(); onBack() }
+            )
+
+            // Concept Disclaimer Banner
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.warningBg)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("Family Protection", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary, fontWeight = FontWeight.Bold)
-                    Text("Protect your loved ones", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                    Icon(Icons.Filled.Info, null, tint = colors.warning, modifier = Modifier.size(20.dp))
+                    Column {
+                        Text(
+                            "Concept Demonstration",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = colors.warning,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Family Protection requires a cloud backend for cross-device communication, " +
+                                "which is not feasible in the current offline-first architecture. " +
+                                "This screen demonstrates the planned UX and local profile management. " +
+                                "Remote monitoring, push alerts, and cross-device sync are planned for a future upgrade.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.textSecondary
+                        )
+                    }
                 }
             }
 
@@ -70,7 +97,7 @@ fun FamilyProtectionScreen(onBack: () -> Unit) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Family Mode", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Enable remote monitoring and simplified UI for family members",
+                            "Enable local family profiles and simplified UI options",
                             style = MaterialTheme.typography.bodySmall, color = colors.textMuted
                         )
                     }
@@ -147,7 +174,20 @@ fun FamilyProtectionScreen(onBack: () -> Unit) {
                 }
 
                 // Family Members
-                SectionHeader(title = "Family Members (${members.size})")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    SectionHeader(title = "Family Members (${members.size})")
+                    IconButton(
+                        onClick = { showAddMemberDialog = true },
+                        modifier = Modifier.size(36.dp).background(colors.primary.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(Icons.Filled.PersonAdd, null, tint = colors.primary, modifier = Modifier.size(18.dp))
+                    }
+                }
+
                 if (members.isEmpty()) {
                     GlassCard {
                         Column(
@@ -157,30 +197,132 @@ fun FamilyProtectionScreen(onBack: () -> Unit) {
                             Icon(Icons.Filled.GroupAdd, null, tint = colors.textMuted, modifier = Modifier.size(40.dp))
                             Spacer(Modifier.height(8.dp))
                             Text("No family members added", style = MaterialTheme.typography.bodyMedium, color = colors.textMuted)
-                            Text("Invite members to share protection", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                            Text("Add profiles to organize protection roles", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
                         }
                     }
                 } else {
                     members.forEach { member ->
-                        FamilyMemberCard(member, colors)
+                        FamilyMemberCard(
+                            member = member,
+                            colors = colors,
+                            onRemove = {
+                                manager.removeFamilyMember(member.id)
+                                members = manager.getMembers()
+                            }
+                        )
                     }
                 }
 
-                // Features Description
-                SectionHeader(title = "Features")
-                FeatureRow(Icons.Filled.Visibility, "Remote Monitoring", "View threat alerts for monitored members")
-                FeatureRow(Icons.Filled.Notifications, "Push Alerts", "Get notified when critical threats are detected")
-                FeatureRow(Icons.Filled.Block, "Remote Blocklist", "Manage blocked numbers for family members")
-                FeatureRow(Icons.Filled.TextFields, "Large Text Mode", "Simplified UI with bigger fonts")
+                // What works now vs. future
+                SectionHeader(title = "Available Now")
+                FeatureRow(Icons.Filled.Person, "Local Profiles", "Create family member profiles with roles")
+                FeatureRow(Icons.Filled.TextFields, "Simplified UI", "Large text mode for accessibility")
+                FeatureRow(Icons.Filled.Security, "Role Labels", "Organize family members by Admin, Elder, Child")
+
+                SectionHeader(title = "Planned (Requires Cloud Backend)")
+                FeatureRow(Icons.Filled.Visibility, "Remote Monitoring", "View threat alerts across devices", dimmed = true)
+                FeatureRow(Icons.Filled.Notifications, "Push Alerts", "Cross-device threat notifications", dimmed = true)
+                FeatureRow(Icons.Filled.Block, "Remote Blocklist", "Shared blocklist across family", dimmed = true)
+                FeatureRow(Icons.Filled.Sync, "Device Sync", "Real-time sync between family devices", dimmed = true)
             }
 
             RakshakXFooter()
         }
     }
+
+    // Add member dialog
+    if (showAddMemberDialog) {
+        var memberName by remember { mutableStateOf("") }
+        var memberRole by remember { mutableStateOf(FamilyRole.ELDER) }
+        var alertEnabled by remember { mutableStateOf(true) }
+
+        AlertDialog(
+            onDismissRequest = { showAddMemberDialog = false },
+            containerColor = colors.surfaceElevated,
+            title = { Text("Add Family Member", color = colors.textPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = memberName,
+                        onValueChange = { memberName = it },
+                        label = { Text("Name", color = colors.textMuted) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.border,
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            cursorColor = colors.primary
+                        )
+                    )
+                    Text("Role", style = MaterialTheme.typography.labelMedium, color = colors.textMuted)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(FamilyRole.ELDER, FamilyRole.CHILD).forEach { role ->
+                            FilterChip(
+                                selected = memberRole == role,
+                                onClick = { memberRole = role },
+                                label = { Text(role.label.split(" ").first()) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = colors.primary.copy(alpha = 0.2f),
+                                    selectedLabelColor = colors.primary
+                                )
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Alert on critical threats", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                        Switch(
+                            checked = alertEnabled,
+                            onCheckedChange = { alertEnabled = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.primary,
+                                checkedTrackColor = colors.primary.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                    Text(
+                        "Profiles are stored locally on this device only.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textMuted
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (memberName.isNotBlank()) {
+                            manager.addFamilyMember(
+                                FamilyMember(
+                                    id = UUID.randomUUID().toString(),
+                                    name = memberName.trim(),
+                                    role = memberRole,
+                                    alertOnCritical = alertEnabled
+                                )
+                            )
+                            members = manager.getMembers()
+                            showAddMemberDialog = false
+                        }
+                    }
+                ) {
+                    Text("Add", color = colors.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddMemberDialog = false }) {
+                    Text("Cancel", color = colors.textMuted)
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun FamilyMemberCard(member: FamilyMember, colors: RakshakXColors) {
+private fun FamilyMemberCard(member: FamilyMember, colors: RakshakXColors, onRemove: () -> Unit) {
     GlassSurface {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
@@ -200,23 +342,30 @@ private fun FamilyMemberCard(member: FamilyMember, colors: RakshakXColors) {
             if (member.alertOnCritical) {
                 StatusChip(text = "Alerts On", color = colors.safe)
             }
+            IconButton(onClick = onRemove, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Filled.Close, null, tint = colors.textMuted, modifier = Modifier.size(16.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun FeatureRow(icon: ImageVector, title: String, desc: String) {
+private fun FeatureRow(icon: ImageVector, title: String, desc: String, dimmed: Boolean = false) {
     val colors = LocalRakshakXColors.current
+    val alpha = if (dimmed) 0.45f else 1f
     GlassSurface {
         Row(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(icon, null, tint = colors.primary, modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = colors.primary.copy(alpha = alpha), modifier = Modifier.size(20.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary.copy(alpha = alpha))
+                Text(desc, style = MaterialTheme.typography.bodySmall, color = colors.textMuted.copy(alpha = alpha))
+            }
+            if (dimmed) {
+                StatusChip(text = "Future", color = colors.textMuted)
             }
         }
     }

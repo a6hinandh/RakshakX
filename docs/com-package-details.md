@@ -9,7 +9,7 @@ Detailed codemap for engineers onboarding onto RakshakX or contributors who need
 ```
 com.security.rakshakx/
 ├── call/           # Call channel — 54 files
-├── web/            # Web channel — 34 files
+├── web/            # Web channel — 37 files
 ├── email/          # Email channel — 17 files
 ├── sms/            # SMS channel — 7 files
 ├── integration/    # Shared ML — 6 files
@@ -21,7 +21,7 @@ com.security.rakshakx/
 │   ├── callerid/
 │   └── modelupdate/
 ├── data/           # Unified data layer — 3 files
-├── ui/             # Compose UI — 18 files
+├── ui/             # Compose UI — 35 files
 ├── permissions/    # Permission model — 1 file
 ├── onboarding/     # Permission setup flow — 1 file
 ├── startup/        # Boot orchestration — 1 file
@@ -70,7 +70,7 @@ com.security.rakshakx/
 
 ## `web/` — Web Channel
 
-**34 files.** VPN-based traffic inspection, accessibility service for browser monitoring, URL scanning, and domain analysis.
+**37 files.** VPN-based traffic inspection, accessibility service for browser monitoring, URL scanning, and domain analysis.
 
 ### `web/services/`
 
@@ -222,7 +222,7 @@ com.security.rakshakx/
 
 ## `ui/` — Compose UI
 
-**18 files.** All Jetpack Compose screens, shared components, and theme.
+**35 files.** All Jetpack Compose screens (25 screens across 5 security domains), shared components, and theme.
 
 ### Screens
 
@@ -243,6 +243,7 @@ com.security.rakshakx/
 | File | Purpose |
 |------|---------|
 | `ui/components/Components.kt` | Shared Compose components (stat cards, section headers, threat chips) |
+| `ui/components/PageHeader.kt` | `PageHeader(title, infoText, onBack?, modifier?, trailing?)` — Shared page header with RakshakX logo, title, info dialog button, and optional back/trailing elements. Used by all 25 screens |
 | `ui/theme/Color.kt` | Premium dark palette: Deep Space (#080C14), Royal Blue (#3B6DE6), etc. |
 | `ui/theme/Theme.kt` | `RakshakXTheme` with Material3 dark color scheme and Compose theming |
 | `ui/navigation/NavHost.kt` | Navigation graph; `Screen` sealed class; hidden routes for detail screens |
@@ -269,7 +270,7 @@ com.security.rakshakx/
 
 | Class | Purpose |
 |-------|---------|
-| `OnboardingActivity` | Progressive permission request flow. Gates dashboard entry until minimum permissions are satisfied |
+| `OnboardingActivity` | Progressive permission request flow. Gates dashboard entry until minimum permissions are satisfied. Accessibility service permission is optional during onboarding and prompted when Web Shield is enabled |
 
 ---
 

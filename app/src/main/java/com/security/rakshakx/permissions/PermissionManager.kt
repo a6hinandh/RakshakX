@@ -123,17 +123,29 @@ object PermissionManager {
             callReady = callReady,
             emailReady = emailReady,
             webReady = webReady,
-            minimumDashboardReady = corePermissionsGranted && notificationListenerEnabled && accessibilityEnabled && overlayEnabled
+            minimumDashboardReady = corePermissionsGranted && notificationListenerEnabled && overlayEnabled
         )
     }
 
     fun getMissingOnboardingRequirements(context: Context): List<String> {
-        val state = getReadinessState(context)
         val missing = mutableListOf<String>()
-        if (!state.corePermissionsGranted) missing += "Core runtime permissions"
-        if (!state.notificationListenerEnabled) missing += "Notification access"
-        if (!state.accessibilityEnabled) missing += "Accessibility service"
-        if (!state.overlayEnabled) missing += "Appear on top permission"
+        if (!hasPermission(context, Manifest.permission.READ_SMS) ||
+            !hasPermission(context, Manifest.permission.RECEIVE_SMS)) {
+            missing += "SMS Permission (Core Protection)"
+        }
+        if (!hasPermission(context, Manifest.permission.READ_CALL_LOG) ||
+            !hasPermission(context, Manifest.permission.READ_PHONE_STATE)) {
+            missing += "Call Log Permission (Core Protection)"
+        }
+        if (!hasPermission(context, Manifest.permission.RECORD_AUDIO)) {
+            missing += "Microphone Permission (Core Protection)"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
+            missing += "Notification Permission (Core Protection)"
+        }
+        if (!isNotificationListenerEnabled(context)) missing += "Notification Listener Access"
+        if (!isDrawOverlaysEnabled(context)) missing += "Display Over Other Apps (Overlay)"
         return missing
     }
 }

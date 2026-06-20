@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.security.rakshakx.core.threatintel.BlocklistType
 import com.security.rakshakx.core.threatintel.ThreatIntelligenceManager
 import com.security.rakshakx.ui.anim.rememberHaptics
 import com.security.rakshakx.ui.components.*
@@ -29,9 +30,12 @@ fun ThreatIntelScreen(onBack: () -> Unit) {
     val haptics = rememberHaptics()
     val manager = remember { ThreatIntelligenceManager.getInstance(context) }
 
-    val isOptedIn by manager.isOptedIn.collectAsState()
-    val blocklistSize = manager.getBlocklistSize()
-    val lastSync = manager.getLastSyncTime()
+    val blocklist by manager.blocklist.collectAsState()
+    val lastUpdated by manager.lastUpdated.collectAsState()
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var addInput by remember { mutableStateOf("") }
+    var addType by remember { mutableStateOf(BlocklistType.PHONE) }
 
     PremiumBackground {
         Column(
@@ -44,47 +48,11 @@ fun ThreatIntelScreen(onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { haptics.tick(); onBack() },
-                    modifier = Modifier.size(40.dp).background(colors.surfaceElevated, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("Threat Intelligence", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary, fontWeight = FontWeight.Bold)
-                    Text("Community protection network", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-                }
-            }
-
-            // Opt-in Card
-            GlassCard(borderColor = if (isOptedIn) colors.primary.copy(alpha = 0.15f) else colors.border.copy(alpha = 0.3f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Community Sharing", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Anonymously share threat indicators (hashed phone numbers & domains only). No message content is ever shared.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textMuted
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = isOptedIn,
-                        onCheckedChange = { manager.setOptIn(it) },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = colors.primary,
-                            checkedTrackColor = colors.primary.copy(alpha = 0.3f)
-                        )
-                    )
-                }
-            }
+            PageHeader(
+                title = "Threat Intelligence",
+                infoText = "Manage local blocklists, manual blocking rules, and auto-detection settings for known threats.",
+                onBack = { haptics.tick(); onBack() }
+            )
 
             // Privacy Guarantee
             Card(
@@ -95,10 +63,10 @@ fun ThreatIntelScreen(onBack: () -> Unit) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Privacy Guarantee", style = MaterialTheme.typography.titleSmall, color = colors.safe, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    PrivacyGuaranteeRow("Only SHA-256 hashes shared, never raw data")
+                    PrivacyGuaranteeRow("Only SHA-256 hashes stored, never raw data")
                     PrivacyGuaranteeRow("No message content leaves your device")
-                    PrivacyGuaranteeRow("Differential privacy for all shared data")
-                    PrivacyGuaranteeRow("Community data supplements, never overrides ML")
+                    PrivacyGuaranteeRow("Blocklist auto-populated from detected scams")
+                    PrivacyGuaranteeRow("Blocklist boosts risk score for repeat offenders")
                 }
             }
 
@@ -107,21 +75,51 @@ fun ThreatIntelScreen(onBack: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GlassSurface(modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("$blocklistSize", style = MaterialTheme.typography.headlineSmall, color = colors.primary, fontWeight = FontWeight.Bold)
+                        Text("${blocklist.size}", style = MaterialTheme.typography.headlineSmall, color = colors.primary, fontWeight = FontWeight.Bold)
                         Text("Blocked Entries", style = MaterialTheme.typography.labelSmall, color = colors.textMuted, letterSpacing = 0.5.sp)
                     }
                 }
                 GlassSurface(modifier = Modifier.weight(1f)) {
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            if (lastSync > 0L)
-                                SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(lastSync))
-                            else "Never",
-                            style = MaterialTheme.typography.headlineSmall,
+                            if (lastUpdated > 0L)
+                                SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(lastUpdated))
+                            else "—",
+                            style = MaterialTheme.typography.titleMedium,
                             color = colors.primary,
                             fontWeight = FontWeight.Bold
                         )
-                        Text("Last Sync", style = MaterialTheme.typography.labelSmall, color = colors.textMuted, letterSpacing = 0.5.sp)
+                        Text("Last Updated", style = MaterialTheme.typography.labelSmall, color = colors.textMuted, letterSpacing = 0.5.sp)
+                    }
+                }
+            }
+
+            // Manual block button
+            GlassSurface(onClick = { showAddDialog = true }) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(Icons.Filled.AddCircle, null, tint = colors.primary, modifier = Modifier.size(22.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Add to Blocklist", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+                        Text("Manually block a phone number or domain", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+                    }
+                    Icon(Icons.Filled.ChevronRight, null, tint = colors.textMuted.copy(alpha = 0.5f), modifier = Modifier.size(18.dp))
+                }
+            }
+
+            if (blocklist.isEmpty()) {
+                GlassCard {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Filled.Shield, null, tint = colors.textMuted, modifier = Modifier.size(36.dp))
+                        Spacer(Modifier.height(8.dp))
+                        Text("Blocklist is empty", style = MaterialTheme.typography.bodyMedium, color = colors.textMuted)
+                        Text("Scam senders and domains are added automatically when threats are detected, or you can add them manually.", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
                     }
                 }
             }
@@ -129,17 +127,92 @@ fun ThreatIntelScreen(onBack: () -> Unit) {
             // How it works
             SectionHeader(title = "How It Works")
             GlassCard {
-                StepRow("1", "Threat detected on your device by ML models")
+                StepRow("1", "SMS flagged as scam by ML models")
                 Spacer(Modifier.height(8.dp))
-                StepRow("2", "Phone/domain hashed with SHA-256 (irreversible)")
+                StepRow("2", "Sender phone & URLs auto-added to local blocklist")
                 Spacer(Modifier.height(8.dp))
-                StepRow("3", "Hash shared anonymously if opted in")
+                StepRow("3", "Future messages from blocked senders get boosted risk scores")
                 Spacer(Modifier.height(8.dp))
-                StepRow("4", "Community blocklist updated for all users")
+                StepRow("4", "Hashes are SHA-256 — original data is never stored")
             }
 
             RakshakXFooter()
         }
+    }
+
+    // Add to blocklist dialog
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false; addInput = "" },
+            containerColor = colors.surfaceElevated,
+            title = { Text("Add to Blocklist", color = colors.textPrimary) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = addType == BlocklistType.PHONE,
+                            onClick = { addType = BlocklistType.PHONE },
+                            label = { Text("Phone") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.primary.copy(alpha = 0.2f),
+                                selectedLabelColor = colors.primary
+                            )
+                        )
+                        FilterChip(
+                            selected = addType == BlocklistType.DOMAIN,
+                            onClick = { addType = BlocklistType.DOMAIN },
+                            label = { Text("Domain") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = colors.primary.copy(alpha = 0.2f),
+                                selectedLabelColor = colors.primary
+                            )
+                        )
+                    }
+                    OutlinedTextField(
+                        value = addInput,
+                        onValueChange = { addInput = it },
+                        label = {
+                            Text(
+                                if (addType == BlocklistType.PHONE) "Phone number" else "Domain (e.g. scam-site.com)",
+                                color = colors.textMuted
+                            )
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colors.primary,
+                            unfocusedBorderColor = colors.border,
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            cursorColor = colors.primary
+                        )
+                    )
+                    Text(
+                        "The value will be SHA-256 hashed before storage. The original is never saved.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textMuted
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (addInput.isNotBlank()) {
+                            manager.addToBlocklist(addInput.trim(), addType)
+                            addInput = ""
+                            showAddDialog = false
+                        }
+                    }
+                ) {
+                    Text("Block", color = colors.primary)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false; addInput = "" }) {
+                    Text("Cancel", color = colors.textMuted)
+                }
+            }
+        )
     }
 }
 

@@ -7,6 +7,8 @@ import android.provider.Telephony
 import android.util.Log
 import com.security.rakshakx.core.SettingsStore
 import com.security.rakshakx.core.correlation.MultiChannelCorrelationEngine
+import com.security.rakshakx.core.threatintel.BlocklistType
+import com.security.rakshakx.core.threatintel.ThreatIntelligenceManager
 import com.security.rakshakx.notifications.SmsFraudNotifications
 import com.security.rakshakx.call.core.storage.DatabaseFactory
 import com.security.rakshakx.data.entities.SmsEventEntity
@@ -41,6 +43,8 @@ class SmsReceiver : BroadcastReceiver() {
 
                 val detector = SmsScamDetector(context)
 
+                val threatIntel = ThreatIntelligenceManager.getInstance(context)
+
                 for (sms in messages) {
                     val sender = sms.displayOriginatingAddress ?: "Unknown"
                     val body   = sms.messageBody ?: ""
@@ -50,8 +54,14 @@ class SmsReceiver : BroadcastReceiver() {
                         continue
                     }
 
+                    // ── Blocklist pre-check ──────────────────────────────────
+                    val blocklistedSender = threatIntel.isNumberBlocked(sender)
+                    if (blocklistedSender) {
+                        Log.i(TAG, "Sender $sender is in threat intel blocklist — boosting risk")
+                    }
+
                     // ── New ML Detection Pipeline ────────────────────────────
-                    val result = detector.analyze(sender, body)
+                    val result = detector.analyze(sender, body, blocklistedSender)
 
                     Log.d(
                         TAG,
@@ -61,6 +71,11 @@ class SmsReceiver : BroadcastReceiver() {
                     // ── Fraud Notification ───────────────────────────────────
                     if (result.isScam) {
                         RiskEngine.recordFlaggedSender(context, sender)
+                        threatIntel.addToBlocklist(sender, BlocklistType.PHONE)
+                        val urls = extractUrls(body)
+                        for (url in urls) {
+                            threatIntel.addToBlocklist(url, BlocklistType.DOMAIN)
+                        }
                         val score0to100 = result.ruleScore.takeIf { it > 0 }
                             ?: (result.finalScore * 100f).toInt().coerceIn(0, 100)
                         SmsFraudNotifications.showFraudAlert(

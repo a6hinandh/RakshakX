@@ -61,31 +61,23 @@ fun ThreatLogsScreen() {
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Threat Log", style = MaterialTheme.typography.headlineLarge, color = colors.textPrimary)
-                    Text(
-                        "${threats.size} events across all channels",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textMuted
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        isLoading = true
-                        scope.launch(Dispatchers.IO) {
-                            threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
-                            isLoading = false
+            PageHeader(
+                title = "Threat Log",
+                infoText = "Browse all detected threats across SMS, Call, Web, and Email channels with severity and timestamp details.",
+                trailing = {
+                    IconButton(
+                        onClick = {
+                            isLoading = true
+                            scope.launch(Dispatchers.IO) {
+                                threats = try { ThreatLogRepository.getAllThreats(context) } catch (_: Exception) { emptyList() }
+                                isLoading = false
+                            }
                         }
+                    ) {
+                        Icon(Icons.Filled.Refresh, "Refresh", tint = colors.textSecondary)
                     }
-                ) {
-                    Icon(Icons.Filled.Refresh, "Refresh", tint = colors.textSecondary)
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 

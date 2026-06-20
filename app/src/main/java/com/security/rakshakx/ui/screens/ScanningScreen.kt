@@ -39,19 +39,11 @@ fun ScanningScreen(activity: Activity, onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { haptics.tick(); onBack() },
-                    modifier = Modifier.size(40.dp).background(colors.surfaceElevated, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("Threat Scanner", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary, fontWeight = FontWeight.Bold)
-                    Text("Analyze suspicious links & QR codes", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-                }
-            }
+            PageHeader(
+                title = "Threat Scanner",
+                infoText = "Scan and analyze suspicious URLs and QR codes for phishing, malware, and other threats.",
+                onBack = { haptics.tick(); onBack() }
+            )
 
             Spacer(modifier = Modifier.height(4.dp))
 

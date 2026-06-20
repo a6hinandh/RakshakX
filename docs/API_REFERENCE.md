@@ -355,6 +355,22 @@ SecurityDigestWorker.cancel(context)          // Cancel scheduled work
 
 ---
 
+## PageHeader
+
+**Location:** `ui/components/PageHeader.kt`
+
+Shared page header composable used across all 25 screens.
+
+### Signature
+
+```kotlin
+PageHeader(title, infoText, onBack?, modifier?, trailing?)
+```
+
+Renders the RakshakX logo, screen title, info dialog button, and optional back navigation / trailing elements. Provides a consistent header experience across all security domain screens.
+
+---
+
 ## SecurityWidgetProvider
 
 **Location:** `widget/SecurityWidgetProvider.kt`

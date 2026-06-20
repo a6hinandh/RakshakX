@@ -233,7 +233,7 @@ Tag:VoskTranscriber         # Call transcription
 RakshakX/
 ├── app/src/main/java/com/security/rakshakx/
 │   ├── call/           # Call channel (54 files)
-│   ├── web/            # Web channel (34 files)
+│   ├── web/            # Web channel (37 files)
 │   ├── email/          # Email channel (17 files)
 │   ├── sms/            # SMS channel (7 files)
 │   ├── integration/    # Shared ML (ScamClassifierRouter, ONNX classifiers)

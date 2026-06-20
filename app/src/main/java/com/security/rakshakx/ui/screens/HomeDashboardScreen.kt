@@ -42,9 +42,12 @@ fun HomeDashboardScreen(
     onNavigateToCorrelation: () -> Unit,
     onNavigateToLiveThreat: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToShieldsControl: () -> Unit,
     onNavigateToScanning: () -> Unit,
     onNavigateToReport: () -> Unit = {},
-    onNavigateToThreatIntel: () -> Unit = {}
+    onNavigateToThreatIntel: () -> Unit = {},
+    onNavigateToDeviceHealth: () -> Unit = {},
+    onNavigateToAttackMatrix: () -> Unit = {}
 ) {
     val colors = LocalRakshakXColors.current
     val context = LocalContext.current
@@ -100,30 +103,15 @@ fun HomeDashboardScreen(
 
             // ── Header (index 0) ──
             StaggeredEntry(index = 0) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "RakshakX",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = colors.textPrimary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "Intelligent Protection",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textMuted
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        HeaderIconButton(Icons.Outlined.Cloud, "Threat Intel", onNavigateToThreatIntel)
+                PageHeader(
+                    title = "RakshakX",
+                    infoText = "Your home dashboard showing protection status, active signal monitors, security tools, and recent threat activity across all channels.",
+                    trailing = {
+                        HeaderIconButton(Icons.Outlined.GridOn, "ATT&CK", onNavigateToAttackMatrix)
                         HeaderIconButton(Icons.Outlined.Assessment, "Report", onNavigateToReport)
                         HeaderIconButton(Icons.Outlined.Settings, "Settings", onNavigateToSettings)
                     }
-                }
+                )
             }
 
             // ── Protection Status (index 1) ──
@@ -145,7 +133,7 @@ fun HomeDashboardScreen(
                         channelStatuses.forEach { status ->
                             SignalPill(
                                 status = status,
-                                onClick = onNavigateToSettings,
+                                onClick = onNavigateToShieldsControl,
                                 modifier = Modifier.weight(1f)
                             )
                         }
@@ -156,14 +144,14 @@ fun HomeDashboardScreen(
             // ── Tools (index 3) ──
             StaggeredEntry(index = 3, baseDelayMs = 80) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SectionHeader(title = "Tools")
+                    SectionHeader(title = "Security Tools")
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ToolCard(
                             title = "Scan Link",
-                            subtitle = "URL & QR analysis",
+                            subtitle = "URL & QR threat analysis",
                             icon = Icons.Filled.QrCodeScanner,
                             accentColor = colors.primary,
                             modifier = Modifier.weight(1f),
@@ -171,11 +159,32 @@ fun HomeDashboardScreen(
                         )
                         ToolCard(
                             title = "Live Monitor",
-                            subtitle = "Real-time feed",
+                            subtitle = "Real-time threat feed",
                             icon = Icons.Filled.Radar,
                             accentColor = colors.primaryVariant,
                             modifier = Modifier.weight(1f),
                             onClick = onNavigateToLiveThreat
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        ToolCard(
+                            title = "Device Health",
+                            subtitle = "Integrity & posture check",
+                            icon = Icons.Filled.PhoneAndroid,
+                            accentColor = Emerald,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToDeviceHealth
+                        )
+                        ToolCard(
+                            title = "ATT&CK Matrix",
+                            subtitle = "MITRE technique coverage",
+                            icon = Icons.Filled.GridOn,
+                            accentColor = Amber,
+                            modifier = Modifier.weight(1f),
+                            onClick = onNavigateToAttackMatrix
                         )
                     }
                 }
@@ -297,27 +306,28 @@ private fun ToolCard(
 ) {
     val colors = LocalRakshakXColors.current
     GlassSurface(
-        modifier = modifier,
+        modifier = modifier.height(110.dp),
         onClick = onClick,
         borderColor = colors.border
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(36.dp)
                     .background(accentColor.copy(alpha = 0.10f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, null, tint = accentColor, modifier = Modifier.size(20.dp))
+                Icon(icon, null, tint = accentColor, modifier = Modifier.size(18.dp))
             }
-            Column {
-                Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.Medium)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(title, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(subtitle, style = MaterialTheme.typography.labelSmall, color = colors.textMuted, maxLines = 1)
         }
     }
 }

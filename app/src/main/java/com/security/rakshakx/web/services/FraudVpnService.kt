@@ -132,6 +132,7 @@ class FraudVpnService : VpnService() {
 
         // Start the pure-Kotlin DNS relay (replaces tun2socks)
         val relay = DnsVpnRelay(this, vpnInterface!!, serviceScope)
+        
         relay.onDnsPacket = { packet, length -> analyzePacket(packet, length) }
         relay.start()
         dnsRelay = relay
@@ -150,16 +151,27 @@ class FraudVpnService : VpnService() {
         Log.i(TAG, "VPN stopped")
     }
 
+
+
     /**
      * Called by the DNS relay for every packet flowing through the TUN.
      * Runs threat analysis on DNS queries inline.
      */
-    private fun analyzePacket(packet: ByteArray, length: Int) {
-        val parsed = parser.parse(packet, length) ?: return
+    private fun analyzePacket(packet: ByteArray, length: Int): Boolean {
+        val parsed = parser.parse(packet, length) ?: return false
 
         val dnsResult = dnsAnalyzer.analyze(parsed)
         val domain = dnsResult?.domain.orEmpty()
-        if (domain.isBlank()) return
+        if (domain.isBlank()) return false
+
+        val isBlocked = com.security.rakshakx.web.analyzers.GlobalBlocklistManager.isBlocked(domain)
+        
+        // Push to live stream
+        com.security.rakshakx.web.analyzers.LiveTrafficStream.addQuery(
+            domain = domain,
+            isBlocked = isBlocked,
+            blockedBy = if (isBlocked) "User Blocklist" else null
+        )
 
         val redirects = redirectTracker.track(domain)
 
@@ -228,6 +240,8 @@ class FraudVpnService : VpnService() {
                 notifier.notifyThreat("RakshakX Warning: $displayDomain", detailMessage)
             }
         }
+        
+        return isBlocked
     }
 
     private fun pickDisplayDomain(domain: String, session: com.security.rakshakx.web.models.BrowserSessionData?): String {

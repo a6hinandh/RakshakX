@@ -15,7 +15,6 @@ class ThreatIntelligenceManager private constructor(private val context: Context
     companion object {
         private const val TAG = "ThreatIntel"
         private const val PREFS_NAME = "rakshakx_threat_intel"
-        private const val KEY_OPT_IN = "community_opt_in"
         private const val KEY_BLOCKLIST = "local_blocklist"
         private const val KEY_LAST_SYNC = "last_sync_timestamp"
 
@@ -31,17 +30,11 @@ class ThreatIntelligenceManager private constructor(private val context: Context
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val _isOptedIn = MutableStateFlow(prefs.getBoolean(KEY_OPT_IN, false))
-    val isOptedIn: StateFlow<Boolean> = _isOptedIn
-
     private val _blocklist = MutableStateFlow(loadBlocklist())
     val blocklist: StateFlow<Set<String>> = _blocklist
 
-    fun setOptIn(enabled: Boolean) {
-        prefs.edit().putBoolean(KEY_OPT_IN, enabled).apply()
-        _isOptedIn.value = enabled
-        Log.d(TAG, "Community sharing opt-in: $enabled")
-    }
+    private val _lastUpdated = MutableStateFlow(prefs.getLong(KEY_LAST_SYNC, 0L))
+    val lastUpdated: StateFlow<Long> = _lastUpdated
 
     fun isNumberBlocked(phoneNumber: String): Boolean {
         val hash = hashPhone(phoneNumber)
@@ -61,6 +54,9 @@ class ThreatIntelligenceManager private constructor(private val context: Context
         val updated = _blocklist.value + hash
         saveBlocklist(updated)
         _blocklist.value = updated
+        val now = System.currentTimeMillis()
+        prefs.edit().putLong(KEY_LAST_SYNC, now).apply()
+        _lastUpdated.value = now
         Log.d(TAG, "Added to blocklist: ${type.name} hash=$hash")
     }
 
@@ -75,8 +71,6 @@ class ThreatIntelligenceManager private constructor(private val context: Context
     }
 
     suspend fun generateAnonymousReport(): ThreatReport? = withContext(Dispatchers.IO) {
-        if (!_isOptedIn.value) return@withContext null
-
         try {
             val db = DatabaseFactory.getInstance(context)
             val dao = db.fraudDao()

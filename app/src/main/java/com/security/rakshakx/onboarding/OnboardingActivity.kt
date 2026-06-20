@@ -1,5 +1,6 @@
 package com.security.rakshakx.onboarding
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -63,6 +64,17 @@ class OnboardingActivity : ComponentActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { refreshReadiness() }
 
+    private val credentialLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            launchDashboard()
+        } else {
+            // Close the application if authorization was cancelled or failed
+            finish()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         refreshReadiness()
@@ -73,8 +85,7 @@ class OnboardingActivity : ComponentActivity() {
                     missingRequirements = PermissionManager.getMissingOnboardingRequirements(this),
                     onComplete = {
                         if (!readinessState.minimumDashboardReady) return@OnboardingScreen
-                        startActivity(Intent(this, MainActivity::class.java))
-                        finish()
+                        checkSecurityAndProceed()
                     },
                     onRequestCorePermissions = { permissionLauncher.launch(PermissionManager.corePermissionsForRuntimeRequest()) },
                     onRequestAccessibility = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
@@ -92,6 +103,29 @@ class OnboardingActivity : ComponentActivity() {
 
     private fun refreshReadiness() {
         readinessState = PermissionManager.getReadinessState(this)
+    }
+
+    private fun checkSecurityAndProceed() {
+        val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+        if (keyguardManager.isDeviceSecure) {
+            val intent = keyguardManager.createConfirmDeviceCredentialIntent(
+                "RakshakX Security Lock",
+                "Authenticate to unlock RakshakX"
+            )
+            if (intent != null) {
+                credentialLauncher.launch(intent)
+            } else {
+                launchDashboard()
+            }
+        } else {
+            // Swipe or none -> direct login (bypass authentication)
+            launchDashboard()
+        }
+    }
+
+    private fun launchDashboard() {
+        startActivity(Intent(this, MainActivity::class.java))
+        finish()
     }
 }
 
@@ -125,7 +159,7 @@ fun OnboardingScreen(
     val steps = listOf(
         OnboardingStep(
             title = "WELCOME",
-            headline = "Intelligent protection,\nprivate by design",
+            headline = "Your Shield. Your Device.\nYour Rules.",
             body = "RakshakX detects scams across calls, SMS, email, and web — using AI that runs entirely on your device. Nothing leaves your phone.",
             icon = Icons.Filled.Shield,
             accentColor = RoyalBlue,
@@ -188,6 +222,8 @@ fun OnboardingScreen(
     val pagerState = rememberPagerState(pageCount = { steps.size })
     val currentStep = pagerState.currentPage
     val isLastStep = currentStep == steps.lastIndex
+
+    var showMissingPermissionsDialog by remember { mutableStateOf(false) }
 
     // Haptic on page change
     var previousPage by remember { mutableIntStateOf(0) }
@@ -334,32 +370,102 @@ fun OnboardingScreen(
                     }
                 }
 
+                // Missing permissions alert dialog
+                if (showMissingPermissionsDialog && missingRequirements.isNotEmpty()) {
+                    AlertDialog(
+                        onDismissRequest = { showMissingPermissionsDialog = false },
+                        icon = { Icon(Icons.Filled.Warning, null, tint = Amber) },
+                        title = {
+                            Text(
+                                "Permissions Required",
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                        },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "The following permissions are still needed:",
+                                    color = colors.textSecondary
+                                )
+                                missingRequirements.forEach { req ->
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Cancel,
+                                            null,
+                                            tint = Crimson,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(req, color = colors.textPrimary)
+                                    }
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Please go back and grant these permissions to continue.",
+                                    color = colors.textMuted,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showMissingPermissionsDialog = false
+                                coroutineScope.launch {
+                                    val firstMissingPage = steps.indexOfFirst { it.isPermissionStep && !it.isGranted() }
+                                    if (firstMissingPage >= 0) {
+                                        pagerState.animateScrollToPage(firstMissingPage)
+                                    }
+                                }
+                            }) {
+                                Text("Go to Permission", color = colors.primary)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showMissingPermissionsDialog = false }) {
+                                Text("Dismiss", color = colors.textMuted)
+                            }
+                        },
+                        containerColor = colors.cardBackground,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                }
+
                 // Primary CTA
                 if (isLastStep) {
                     Button(
                         onClick = {
-                            haptics.success()
-                            onComplete()
+                            if (readinessState.minimumDashboardReady) {
+                                haptics.success()
+                                onComplete()
+                            } else {
+                                haptics.warning()
+                                showMissingPermissionsDialog = true
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
-                        enabled = readinessState.minimumDashboardReady,
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Emerald,
-                            disabledContainerColor = colors.surfaceElevated
+                            containerColor = if (readinessState.minimumDashboardReady) Emerald else colors.surfaceElevated
                         )
                     ) {
                         Text(
-                            if (readinessState.minimumDashboardReady) "Start Protection" else "Grant Required Permissions",
+                            if (readinessState.minimumDashboardReady) "Start Protection" else "Start Protection",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = if (readinessState.minimumDashboardReady) Color.White else colors.textSecondary
                         )
-                        if (readinessState.minimumDashboardReady) {
-                            Spacer(Modifier.width(8.dp))
-                            Icon(Icons.Filled.ArrowForward, null, modifier = Modifier.size(20.dp))
-                        }
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Filled.ArrowForward,
+                            null,
+                            modifier = Modifier.size(20.dp),
+                            tint = if (readinessState.minimumDashboardReady) Color.White else colors.textMuted
+                        )
                     }
                 } else {
                     Button(
@@ -541,37 +647,68 @@ private fun WelcomeVisual() {
     )
 
     Box(contentAlignment = Alignment.Center) {
-        // Outer rotating dashed ring
+        // Outer glow aura
+        Box(
+            modifier = Modifier
+                .size(260.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            RoyalBlue.copy(alpha = glowAlpha * 0.6f),
+                            Emerald.copy(alpha = glowAlpha * 0.3f),
+                            Color.Transparent
+                        )
+                    ),
+                    CircleShape
+                )
+        )
+
+        // Outer rotating gradient ring
         Box(
             modifier = Modifier
                 .size(240.dp)
                 .rotate(ringRotation)
                 .border(
-                    width = 1.dp,
+                    width = 2.dp,
                     brush = Brush.sweepGradient(
                         listOf(
-                            RoyalBlue.copy(alpha = 0.4f),
+                            RoyalBlue.copy(alpha = 0.8f),
+                            Emerald.copy(alpha = 0.5f),
                             Color.Transparent,
-                            Emerald.copy(alpha = 0.3f),
+                            RoyalBlue.copy(alpha = 0.6f),
+                            Emerald.copy(alpha = 0.4f),
                             Color.Transparent,
-                            RoyalBlue.copy(alpha = 0.4f)
+                            RoyalBlue.copy(alpha = 0.8f)
                         )
                     ),
                     shape = CircleShape
                 )
         )
 
-        // Inner glow circle
+        // Inner glow circle behind logo
         Box(
             modifier = Modifier
                 .size(200.dp)
                 .background(
                     Brush.radialGradient(
                         listOf(
-                            RoyalBlue.copy(alpha = glowAlpha),
+                            RoyalBlue.copy(alpha = glowAlpha * 1.2f),
+                            RoyalBlue.copy(alpha = glowAlpha * 0.4f),
                             Color.Transparent
                         )
-                    )
+                    ),
+                    CircleShape
+                )
+                .border(
+                    width = 1.5.dp,
+                    brush = Brush.sweepGradient(
+                        listOf(
+                            RoyalBlue.copy(alpha = 0.5f),
+                            Emerald.copy(alpha = 0.3f),
+                            RoyalBlue.copy(alpha = 0.5f)
+                        )
+                    ),
+                    shape = CircleShape
                 )
         )
 

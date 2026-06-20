@@ -1,6 +1,7 @@
 package com.security.rakshakx.ui.data
 
 import android.content.Context
+import com.security.rakshakx.call.callanalysis.RiskConfig
 import com.security.rakshakx.call.callanalysis.data.CallDatabase
 import com.security.rakshakx.call.core.storage.DatabaseFactory
 import com.security.rakshakx.email.database.ThreatDatabase as EmailThreatDb
@@ -50,15 +51,15 @@ object ThreatLogRepository {
         try {
             val callDb = CallDatabase.getInstance(context)
             val callRecords = callDb.callDao().getRecentCallsSync()
-            callRecords.filter { it.riskScore >= 0.3f }.forEach { c ->
+            callRecords.filter { it.riskScore >= RiskConfig.THRESHOLD_MEDIUM }.forEach { c ->
                 results.add(
                     ThreatLogEntry(
                         id = "call_${c.id}",
                         channel = Channel.CALL,
                         severity = when {
-                            c.riskScore >= 0.7f -> Severity.CRITICAL
-                            c.riskScore >= 0.5f -> Severity.HIGH
-                            c.riskScore >= 0.3f -> Severity.MEDIUM
+                            c.riskScore >= RiskConfig.THRESHOLD_CRITICAL -> Severity.CRITICAL
+                            c.riskScore >= RiskConfig.THRESHOLD_HIGH -> Severity.HIGH
+                            c.riskScore >= RiskConfig.THRESHOLD_MEDIUM -> Severity.MEDIUM
                             else -> Severity.LOW
                         },
                         title = "Suspicious Call",
@@ -88,12 +89,12 @@ object ThreatLogRepository {
                         id = "sms_${s.id}",
                         channel = Channel.SMS,
                         severity = when {
-                            s.fraudRiskScore >= 0.7f -> Severity.CRITICAL
-                            s.fraudRiskScore >= 0.5f -> Severity.HIGH
-                            s.fraudRiskScore >= 0.3f -> Severity.MEDIUM
+                            s.fraudRiskScore >= RiskConfig.THRESHOLD_CRITICAL -> Severity.CRITICAL
+                            s.fraudRiskScore >= RiskConfig.THRESHOLD_HIGH -> Severity.HIGH
+                            s.fraudRiskScore >= RiskConfig.THRESHOLD_MEDIUM -> Severity.MEDIUM
                             else -> Severity.LOW
                         },
-                        title = if (s.fraudRiskScore >= 0.5f) "Scam SMS Detected" else "Suspicious SMS",
+                        title = if (s.fraudRiskScore >= RiskConfig.THRESHOLD_HIGH) "Scam SMS Detected" else "Suspicious SMS",
                         description = s.messageBody,
                         source = s.sender,
                         riskScore = s.fraudRiskScore,
@@ -107,11 +108,16 @@ object ThreatLogRepository {
             }
         } catch (_: Exception) { }
 
-        // ── Web threats (Web Module Database) ──
+        // ── Web threats (Web Module Database) — deduplicated by domain ──
         try {
             val webModuleDb = com.security.rakshakx.web.storage.ThreatDatabase.getInstance(context)
-            val webThreats = webModuleDb.threatDao().recent(50)
-            webThreats.forEach { w ->
+            val webThreats = webModuleDb.threatDao().recent(200)
+            val deduped = webThreats
+                .groupBy { it.domain.lowercase() }
+                .map { (_, entries) -> entries.maxByOrNull { it.timestamp } ?: entries.first() }
+                .sortedByDescending { it.timestamp }
+                .take(50)
+            deduped.forEach { w ->
                 results.add(
                     ThreatLogEntry(
                         id = "web_mod_${w.id}",
@@ -123,11 +129,11 @@ object ThreatLogRepository {
                             else -> Severity.LOW
                         },
                         title = w.fraudCategory.ifBlank { "Phishing URL Intercepted" },
-                        description = w.url,
+                        description = w.url.ifBlank { w.domain },
                         source = w.domain,
                         riskScore = w.fraudScore / 100f,
                         timestamp = w.timestamp,
-                        indicators = w.reasons.split(",").filter { it.isNotBlank() },
+                        indicators = w.reasons.split("|", ",").map { it.trim() }.filter { it.isNotBlank() },
                         reason = w.blockReason
                     )
                 )

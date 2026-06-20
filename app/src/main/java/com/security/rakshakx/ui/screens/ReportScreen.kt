@@ -1,9 +1,12 @@
 package com.security.rakshakx.ui.screens
 
 import android.content.Context
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -69,19 +72,11 @@ fun ReportScreen(onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { haptics.tick(); onBack() },
-                    modifier = Modifier.size(40.dp).background(colors.surfaceElevated, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(Icons.Filled.ArrowBack, null, tint = colors.textPrimary, modifier = Modifier.size(20.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text("Security Report", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary, fontWeight = FontWeight.Bold)
-                    Text("Threat analytics & export", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
-                }
-            }
+            PageHeader(
+                title = "Security Report",
+                infoText = "View threat analytics, channel breakdowns, and export security reports as CSV.",
+                onBack = { haptics.tick(); onBack() }
+            )
 
             // ── Summary Stats ──
             SectionHeader(title = "Overview")
@@ -125,8 +120,8 @@ fun ReportScreen(onBack: () -> Unit) {
                     scope.launch(Dispatchers.IO) {
                         try {
                             val csv = generateCsvReport(threats)
-                            val file = saveCsvReport(context, csv)
-                            exportMessage = "Report saved to ${file.name}"
+                            val path = saveCsvReport(context, csv)
+                            exportMessage = "Report saved to $path"
                         } catch (e: Exception) {
                             exportMessage = "Export failed: ${e.message}"
                         }
@@ -152,10 +147,7 @@ fun ReportScreen(onBack: () -> Unit) {
                     scope.launch(Dispatchers.IO) {
                         try {
                             val csv = generateCsvReport(threats)
-                            val file = saveCsvReport(context, csv)
-                            val uri = androidx.core.content.FileProvider.getUriForFile(
-                                context, "${context.packageName}.provider", file
-                            )
+                            val uri = getShareReportUri(context, csv)
                             val intent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/csv"
                                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -163,8 +155,8 @@ fun ReportScreen(onBack: () -> Unit) {
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             }
                             context.startActivity(Intent.createChooser(intent, "Share Report"))
-                        } catch (_: Exception) {
-                            exportMessage = "Share failed"
+                        } catch (e: Exception) {
+                            exportMessage = "Share failed: ${e.message}"
                         }
                     }
                 },
@@ -259,11 +251,41 @@ private fun generateCsvReport(threats: List<ThreatLogEntry>): String {
     return sb.toString()
 }
 
-private fun saveCsvReport(context: Context, csv: String): File {
+private fun saveCsvReport(context: Context, csv: String): String {
     val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "rakshakx_reports")
+    val fileName = "rakshakx_report_$dateStr.csv"
+    
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val resolver = context.contentResolver
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/RakshakX")
+        }
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+        if (uri != null) {
+            resolver.openOutputStream(uri)?.use { outputStream ->
+                outputStream.write(csv.toByteArray())
+            }
+            return "Downloads/RakshakX/$fileName"
+        }
+    }
+    
+    // Legacy fallback (API < 29)
+    val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "RakshakX")
+    dir.mkdirs()
+    val file = File(dir, fileName)
+    file.writeText(csv)
+    return file.absolutePath
+}
+
+private fun getShareReportUri(context: Context, csv: String): Uri {
+    val dateStr = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+    val dir = File(context.cacheDir, "shared_reports")
     dir.mkdirs()
     val file = File(dir, "rakshakx_report_$dateStr.csv")
     file.writeText(csv)
-    return file
+    return androidx.core.content.FileProvider.getUriForFile(
+        context, "com.security.rakshakx.provider", file
+    )
 }

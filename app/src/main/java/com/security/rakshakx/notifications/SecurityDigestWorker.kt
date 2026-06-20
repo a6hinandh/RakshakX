@@ -6,6 +6,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.security.rakshakx.call.core.storage.DatabaseFactory
+import com.security.rakshakx.core.SettingsStore
+import com.security.rakshakx.core.threatintel.ThreatIntelligenceManager
+import com.security.rakshakx.ui.data.ThreatLogRepository
 import com.security.rakshakx.permissions.PermissionManager
 import java.util.concurrent.TimeUnit
 
@@ -47,6 +50,27 @@ class SecurityDigestWorker(
     override suspend fun doWork(): Result {
         return try {
             val context = applicationContext
+            
+            // Daily automated logs cleanup based on settings retention period
+            try {
+                val settingsStore = SettingsStore.getInstance(context)
+                val autoDeleteDaysVal = settingsStore.autoDeleteDays.value
+                ThreatLogRepository.cleanOldLogs(context, autoDeleteDaysVal)
+            } catch (e: Exception) {
+                Log.w(TAG, "Data retention automated cleanup failed: ${e.message}")
+            }
+
+            // Generate threat intel report from recent flagged data
+            try {
+                val threatIntel = ThreatIntelligenceManager.getInstance(context)
+                val report = threatIntel.generateAnonymousReport()
+                if (report != null) {
+                    Log.d(TAG, "Threat intel report: ${report.threatCount} threats, ${report.phoneHashes.size} phones, ${report.domainHashes.size} domains")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Threat intel report generation failed: ${e.message}")
+            }
+
             if (!PermissionManager.hasNotificationPermission(context)) {
                 return Result.success()
             }

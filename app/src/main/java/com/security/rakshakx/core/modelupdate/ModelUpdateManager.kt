@@ -32,7 +32,7 @@ class ModelUpdateManager private constructor(private val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val _currentModelVersion = MutableStateFlow(prefs.getString(KEY_MODEL_VERSION, "1.0.0") ?: "1.0.0")
+    private val _currentModelVersion = MutableStateFlow(prefs.getString(KEY_MODEL_VERSION, "2.0.0") ?: "2.0.0")
     val currentModelVersion: StateFlow<String> = _currentModelVersion
 
     private val _currentRuleVersion = MutableStateFlow(prefs.getInt(KEY_RULE_VERSION, 1))

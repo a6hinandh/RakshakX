@@ -38,8 +38,8 @@ class DnsVpnRelay(
     private var relayJob: Job? = null
     private val writeMutex = Mutex()
 
-    /** Callback invoked for every packet flowing through the relay. */
-    var onDnsPacket: ((rawPacket: ByteArray, length: Int) -> Unit)? = null
+    /** Callback invoked for every packet flowing through the relay. Returns true if the packet should be blocked. */
+    var onDnsPacket: ((rawPacket: ByteArray, length: Int) -> Boolean)? = null
 
     fun start() {
         relayJob = scope.launch { runRelay() }
@@ -68,9 +68,10 @@ class DnsVpnRelay(
 
             val packet = buffer.copyOfRange(0, length)
 
-            // Notify observer for threat analysis
+            // Notify observer for threat analysis and check if it should be blocked
+            var shouldBlock = false
             try {
-                onDnsPacket?.invoke(packet, length)
+                shouldBlock = onDnsPacket?.invoke(packet, length) == true
             } catch (_: Exception) {}
 
             when {
@@ -78,7 +79,12 @@ class DnsVpnRelay(
                     // Forward DNS queries asynchronously so we don't block reads
                     scope.launch(Dispatchers.IO) {
                         try {
-                            val response = buildDnsResponse(packet, length)
+                            val response = if (shouldBlock) {
+                                buildBlockedDnsResponse(packet, length)
+                            } else {
+                                buildDnsResponse(packet, length)
+                            }
+                            
                             if (response != null) {
                                 writeMutex.withLock {
                                     output.write(response)
@@ -143,6 +149,83 @@ class DnsVpnRelay(
         val dnsPayload = packet.copyOfRange(dnsOffset, length)
 
         val responsePayload = forwardDns(dnsPayload) ?: return null
+
+        return buildIpv4UdpPacket(
+            srcIp = dstIp, dstIp = srcIp,
+            srcPort = dstPort, dstPort = srcPort,
+            payload = responsePayload
+        )
+    }
+
+    private fun buildBlockedDnsResponse(packet: ByteArray, length: Int): ByteArray? {
+        val ihl = (packet[0].toInt() and 0x0F) * 4
+        val dnsOffset = ihl + 8
+        if (dnsOffset >= length) return null
+
+        val srcIp = copyBytes(packet, 12, 4)
+        val dstIp = copyBytes(packet, 16, 4)
+        val srcPort = readUint16(packet, ihl)
+        val dstPort = readUint16(packet, ihl + 2)
+        val dnsPayload = packet.copyOfRange(dnsOffset, length)
+
+        // Parse query to construct a fake response
+        // Transaction ID (2 bytes)
+        val txId = copyBytes(dnsPayload, 0, 2)
+        // Flags: QR=1, Opcode=0, AA=1, TC=0, RD=1, RA=1, Z=0, RCODE=0
+        val flags = byteArrayOf(0x81.toByte(), 0x80.toByte())
+        
+        // Find end of query name to get QTYPE and QCLASS
+        var qOffset = 12
+        while (qOffset < dnsPayload.size && dnsPayload[qOffset].toInt() != 0) {
+            qOffset += dnsPayload[qOffset].toInt() + 1
+        }
+        qOffset += 1 // skip null byte
+        
+        if (qOffset + 4 > dnsPayload.size) return null // invalid query
+
+        // We only care if it's an A record (type 1) or AAAA record (type 28).
+        // Let's just return a generic A record pointing to 0.0.0.0
+        val querySection = copyBytes(dnsPayload, 12, qOffset + 4 - 12)
+        
+        // Response payload size: 12 (header) + query section + 16 (answer section)
+        val responsePayload = ByteArray(12 + querySection.size + 16)
+        
+        // Header
+        System.arraycopy(txId, 0, responsePayload, 0, 2)
+        System.arraycopy(flags, 0, responsePayload, 2, 2)
+        // QDCOUNT = 1
+        responsePayload[4] = 0; responsePayload[5] = 1
+        // ANCOUNT = 1
+        responsePayload[6] = 0; responsePayload[7] = 1
+        // NSCOUNT = 0, ARCOUNT = 0 (leave 0)
+        
+        // Query Section
+        System.arraycopy(querySection, 0, responsePayload, 12, querySection.size)
+        
+        // Answer Section
+        var ansOffset = 12 + querySection.size
+        // Name (Pointer to query name at offset 12)
+        responsePayload[ansOffset++] = 0xC0.toByte()
+        responsePayload[ansOffset++] = 0x0C.toByte()
+        // Type (A = 1)
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 1
+        // Class (IN = 1)
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 1
+        // TTL (300)
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 1
+        responsePayload[ansOffset++] = 0x2C.toByte()
+        // RDLENGTH (4 bytes for IPv4)
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 4
+        // RDATA (0.0.0.0)
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 0
+        responsePayload[ansOffset++] = 0
 
         return buildIpv4UdpPacket(
             srcIp = dstIp, dstIp = srcIp,

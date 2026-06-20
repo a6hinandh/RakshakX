@@ -15,6 +15,9 @@ class VpnThreatLogger(context: Context) {
     private val database = ThreatDatabase.getInstance(context)
     private val legacyCleaner = EncryptedStorageManager(context)
 
+    private val recentlyLoggedDomains = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val deduplicationWindowMs = 60_000L
+
     init {
         legacyCleaner.deleteLegacyLog("browser_sessions.jsonl")
     }
@@ -25,6 +28,16 @@ class VpnThreatLogger(context: Context) {
         session: BrowserSessionData?,
         fraudResult: FraudRiskResult? = null
     ) {
+        val domain = assessment.domain.lowercase()
+        val now = System.currentTimeMillis()
+        val lastLogged = recentlyLoggedDomains[domain]
+        if (lastLogged != null && (now - lastLogged) < deduplicationWindowMs) {
+            return
+        }
+        recentlyLoggedDomains[domain] = now
+
+        recentlyLoggedDomains.entries.removeAll { (now - it.value) > deduplicationWindowMs * 5 }
+
         val entity = ThreatEntity(
             timestamp = assessment.timestamp,
             domain = assessment.domain,

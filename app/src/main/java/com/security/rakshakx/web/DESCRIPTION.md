@@ -1,6 +1,6 @@
 # Web Module
 
-**34 files.** VPN-based network traffic inspection, accessibility service browser monitoring, and URL/QR scanning.
+**37 files.** VPN-based network traffic inspection, accessibility service browser monitoring, and URL/QR scanning.
 
 ## Responsibilities
 

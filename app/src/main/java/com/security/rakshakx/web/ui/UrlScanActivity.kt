@@ -33,6 +33,7 @@ import com.security.rakshakx.core.utils.HapticFeedbackManager
 import com.security.rakshakx.data.entities.WebEventEntity
 import com.security.rakshakx.call.core.storage.DatabaseFactory
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.text.style.TextAlign
 
 class UrlScanActivity : ComponentActivity() {
 
@@ -65,10 +66,19 @@ class UrlScanActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                if (urlToScan.isBlank()) {
-                    ErrorDialog("No valid URL found to scan.")
+                var currentUrlToScan by remember { mutableStateOf(urlToScan) }
+                
+                if (currentUrlToScan.isBlank()) {
+                    UrlInputDialog(
+                        onScan = { enteredUrl ->
+                            currentUrlToScan = enteredUrl
+                        },
+                        onDismiss = {
+                            finish()
+                        }
+                    )
                 } else {
-                    ScanResultDialog(urlToScan)
+                    ScanResultDialog(currentUrlToScan)
                 }
             }
         }
@@ -301,6 +311,103 @@ class UrlScanActivity : ComponentActivity() {
                 }
             }
         )
+    }
+
+    @Composable
+    fun UrlInputDialog(onScan: (String) -> Unit, onDismiss: () -> Unit) {
+        var inputUrl by remember { mutableStateOf("") }
+        var isError by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 8.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Link Interceptor",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Enter or paste a URL to analyze risk score and phishing probability.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    OutlinedTextField(
+                        value = inputUrl,
+                        onValueChange = {
+                            inputUrl = it
+                            isError = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("URL to scan") },
+                        placeholder = { Text("https://example.com") },
+                        singleLine = true,
+                        isError = isError,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    if (isError) {
+                        Text(
+                            text = "Please enter a valid URL.",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.align(Alignment.Start).padding(start = 8.dp, top = 4.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Cancel")
+                        }
+                        Button(
+                            onClick = {
+                                if (inputUrl.isNotBlank()) {
+                                    onScan(inputUrl.trim())
+                                } else {
+                                    isError = true
+                                }
+                            },
+                            modifier = Modifier.weight(1.5f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Scan Link", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun getDomain(urlStr: String): String {

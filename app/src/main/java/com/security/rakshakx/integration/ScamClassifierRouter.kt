@@ -96,11 +96,15 @@ class ScamClassifierRouter(private val context: Context) {
         
         val finalScore = (mlScamProb * mlWeight) + ((ruleScore / 100f) * ruleWeight)
         
-        // Alert threshold: if finalScore >= 0.40 (40%), we mark as SCAM
-        val isScam = finalScore >= 0.40f
+        // Alert threshold: determined dynamically by user's settings sensitivity
+        val sensitivity = com.security.rakshakx.core.SettingsStore.getInstance(context).sensitivity.value
+        val alertThreshold = (0.70f - (sensitivity * 0.60f)).coerceIn(0.10f, 0.85f)
+        val scamThreshold = (alertThreshold + 0.30f).coerceIn(alertThreshold + 0.05f, 0.95f)
+
+        val isScam = finalScore >= alertThreshold
         val finalLabel = when {
-            finalScore >= 0.70f -> "SCAM"
-            finalScore >= 0.40f -> "SUSPICIOUS"
+            finalScore >= scamThreshold -> "SCAM"
+            finalScore >= alertThreshold -> "SUSPICIOUS"
             else -> "SAFE"
         }
 

@@ -96,7 +96,7 @@ RakshakX requests sensitive permissions. Each is justified by a specific detecti
 
 ### Progressive Onboarding
 
-Permissions are not requested all at once. `OnboardingActivity` walks users through each permission with clear explanations. The app enforces minimum permissions before dashboard access via `PermissionManager.getReadinessState()`.
+Permissions are not requested all at once. `OnboardingActivity` walks users through each permission with clear explanations. The app enforces minimum permissions before dashboard access via `PermissionManager.getReadinessState()`. Accessibility service permission is optional during onboarding and is prompted when Web Shield is enabled.
 
 ### Runtime Guards
 

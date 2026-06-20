@@ -144,6 +144,131 @@ Incoming call → CallStateMonitor (PHONE_STATE broadcast)
 | **Child** | Restricted controls, all critical alerts forwarded to admin |
 | **Self** | Standard single-user mode |
 
+### 10. Device Integrity & Health Scoring
+
+`DeviceIntegrityScanner` performs a comprehensive security posture evaluation of the Android device itself:
+
+- **Root detection** — checks `/system/bin/su`, `/system/xbin/su`, Magisk paths, SuperSU artifacts, `Build.TAGS` for test-keys
+- **Weighted risk scoring** — deductions for root (-40), debug build (-10), ADB enabled (-10), developer options (-5), unknown sources (-10), security patch >90 days old (-15), no screen lock (-15), no encryption (-10), no Play Protect (-10)
+- **Composite Security Posture Score** — `SecurityPostureScore` combines device score (40%), network score (30%), and active threat count (30%) into a letter grade (A–F)
+- **`DeviceHealthScreen`** — animated arc score ring with grade-colored fill, staggered finding cards with severity-colored borders
+
+### 11. App Security Auditing
+
+`AppSecurityAuditor` iterates all installed packages via `PackageManager` and evaluates each app against a multi-factor risk model:
+
+- **`PermissionRiskModel`** — 40+ permission weights (CAMERA:15, RECORD_AUDIO:15, BIND_ACCESSIBILITY_SERVICE:30, PROCESS_OUTGOING_CALLS:20) with spyware cluster detection (CAMERA+RECORD_AUDIO+INTERNET = +20 bonus), data harvesting cluster, and overlay attack cluster
+- **Install source classification** — Play Store / Sideloaded / System / Unknown via installer package name
+- **Risk levels** — SAFE / LOW / MEDIUM / HIGH / CRITICAL based on permission score, sideload status, device admin status
+- **`AppAuditScreen`** — filterable list with risk badge, top-3 dangerous permissions, and install source chip per app
+
+### 12. Wi-Fi Security Analysis
+
+`WifiSecurityAnalyzer` evaluates the current Wi-Fi connection for encryption quality and active attacks:
+
+- **Encryption classification** — parses `WifiManager` capabilities string for WPA3 / WPA2 / WPA / WEP / OPEN; scored 100/85/50/20/0
+- **Evil-twin detection** — identifies multiple BSSIDs sharing the same SSID at strong signal strength (rogue AP attack)
+- **DNS hijack detection** — resolves `connectivitycheck.gstatic.com` and verifies the response IP falls within known Google ranges; any other IP indicates DNS manipulation
+- **Captive portal detection** — HTTP 204 check to identify intercepting portals before sensitive operations
+- **`WifiAuditScreen`** — arc score ring, encryption badge, threat card list, and specific remediation recommendations
+
+### 13. Application Firewall
+
+`FirewallRuleStore` backed by `EncryptedSharedPreferences` provides per-app network policy enforcement:
+
+- **Per-app Wi-Fi / Mobile data toggles** — rules stored as JSON in `EncryptedSharedPreferences` (AES-256-GCM, `MasterKey` via AndroidKeyStore)
+- **`FirewallRule`** data class — packageName, allowWifi, allowMobile, blockedDomains list, enabled flag
+- **`FirewallScreen`** — non-system app list from `PackageManager`, switch toggles per app, real-time rule persistence
+- Designed to feed into `FraudVpnService`'s UID-based packet filtering for enforcement at the network layer
+
+### 14. Local Network Scanner
+
+`LocalNetworkScanner` maps the local Wi-Fi subnet for security threats:
+
+- **Parallel host discovery** — derives /24 subnet from `WifiManager.dhcpInfo`, fans 254 concurrent `isReachable(200ms)` probes via `async`/`awaitAll`
+- **TCP port scanning** — 12 ports per discovered host: 21 (FTP), 22 (SSH), 23 (Telnet), 80, 443, 445 (SMB), 1883 (MQTT), 5683 (CoAP), 5900 (VNC), 3389 (RDP), 8080, 8443
+- **MAC-to-vendor lookup** — reads `/proc/net/arp` for MAC addresses, maps against 20-entry OUI table
+- **Risk classification** — Telnet=HIGH_RISK (unencrypted remote shell), SMB/VNC/RDP=SUSPICIOUS (lateral movement surfaces)
+- **`NetworkScanScreen`** — pulsing radar animation during scan, device cards with colored risky-port chips
+
+### 15. Traffic Anomaly Detection
+
+`TrafficAnomalyDetector` (in `web/analyzers/`) performs behavioral analysis on DNS query streams intercepted by the VPN:
+
+- **C2 Beaconing** — inter-arrival variance <5s² with <2min average interval; indicates automated periodic callback to a command-and-control server
+- **DGA Domain Detection** — Shannon entropy >3.5, consonant run >8, digit ratio >0.3, domain length >15; characteristic of Domain Generation Algorithm malware
+- **DNS Tunneling** — label length >30 chars (HIGH) or >50 unique queries/min (MEDIUM); data exfiltration via DNS sublabel encoding
+- **Cryptomining** — 24 known mining pool domains (pool.supportxmr.com, xmrpool.eu, etc.)
+- **Data Exfiltration** — >100 unique subdomains per apex domain within a 5-minute window
+- **`TrafficMonitorScreen`** — five detector status rows with active/severity indicators, anomaly cards with technique description
+
+### 16. Privacy Dashboard & Tracker Detection
+
+`TrackerDatabase` contains 50+ tracker signatures mapped to `TrackerCategory` (ANALYTICS, ADVERTISING, CRASH_REPORTING, FINGERPRINTING, SOCIAL, PROFILING):
+
+- Detects trackers in installed apps by matching package names against known tracker SDKs (Google Analytics, Facebook Ads, AppsFlyer, Adjust, Branch, Firebase, Crashlytics, etc.)
+- Canvas-rendered per-category progress bars showing tracker prevalence
+- App-level drill-down listing specific tracker SDKs embedded per app
+- **`PrivacyDashboardScreen`** — expandable app rows with category breakdown and block-domain list
+
+### 17. Secure Credential Vault
+
+`SecureVault` provides on-device encrypted credential storage using two independent security layers:
+
+- **Transport encryption** — AndroidKeyStore AES/GCM/NoPadding, fresh IV prepended to every ciphertext, Base64 output
+- **Storage layer** — `EncryptedSharedPreferences` with `MasterKey` (hardware-backed on TEE/StrongBox devices)
+- **`VaultEntry`** — id, title, content, category (`VaultCategory`: PASSWORD / NOTE / RECOVERY_CODE / API_KEY / CREDIT_CARD / OTHER), timestamps
+- **`VaultScreen`** — `combinedClickable` list with long-press reveal, `AddEntryDialog` with category dropdown, monospace font for sensitive values
+
+### 18. Data Breach Detection (k-Anonymity HIBP)
+
+`BreachChecker` integrates with the Have I Been Pwned v3 API using **k-anonymity** — the full hash or email never leaves the device:
+
+- **Email breach check** — queries `/breachedaccount/{email}` with only the SHA-1 prefix sent; 404=clean, 200=returns breach list
+- **Password hash check** — sends only the first 5 hex chars of the SHA-1 password hash to `/range/{prefix}`; compares the returned hash suffixes locally
+- **Response caching** — results cached in `SharedPreferences` to avoid repeat API calls
+- **`HttpURLConnection` only** — zero external HTTP library dependencies; no OkHttp/Retrofit
+- **`BreachCheckScreen`** — email input with breach detail cards, password section with k-anonymity guarantee display
+
+### 19. MITRE ATT&CK Mobile Matrix
+
+`MitreAttackMapper` maps detected threats to the MITRE ATT&CK for Mobile framework:
+
+| Technique ID | Name | Tactic | Detection Source |
+|-------------|------|--------|-----------------|
+| T1660 | Phishing (SMS) | Initial Access | SMS channel |
+| T1660.001 | Phishing: Spearphishing Voice | Initial Access | Call channel |
+| T1566 | Phishing (Email) | Initial Access | Email channel |
+| T1659 | Content Injection | Initial Access | Web channel |
+| T1417 | Input Capture: Keylogging | Collection | App audit |
+| T1571 | Non-Standard Port | C2 | Beaconing detector |
+| T1496 | Resource Hijacking | Impact | Cryptomining detector |
+| T1437 | Application Layer Protocol | Exfiltration | Exfil detector |
+| T1584.002 | Compromise Infrastructure: DNS | Resource Dev | Wi-Fi audit |
+| T1404 | Exploitation for Priv Esc | Privilege Escalation | Device integrity |
+| T1476 | Deliver Malicious App | Initial Access | App audit |
+| T1418 | Software Discovery | Discovery | App audit |
+
+- **`AttackMatrixScreen`** — tactic-grouped technique cards (red border = detected, grey = monitored), coverage stats, tap-to-expand detail panel with mitigations
+
+### 20. Threat Analytics Dashboard
+
+`ThreatAnalyticsScreen` visualizes the historical threat dataset:
+
+- **24-hour trend card** — rolling hourly event count for the past 24 hours
+- **Channel breakdown bar chart** — Canvas `drawRoundRect` horizontal bars per channel (SMS/Call/Email/Web/Messaging) normalized to max count
+- **24-hour heatmap grid** — 24-column Canvas grid where each cell's alpha encodes threat density for that hour, enabling pattern recognition of attack timing
+
+### 21. Forensic Export (STIX 2.1)
+
+`ForensicExporter` generates industry-standard threat intelligence bundles:
+
+- **STIX 2.1 JSON format** — threat-actor, identity, indicator, relationship, and report objects with proper `spec_version: "2.1"` headers
+- **Device fingerprint** — SHA-256 of `ANDROID_ID + appVersion`; included in every bundle as the reporting identity
+- **Integrity hash** — `computeIntegrityHash()` produces a SHA-256 of the entire bundle for tamper evidence
+- **File output** — saves to `getExternalFilesDir()/rakshakx_forensics/` for direct file access without FileProvider
+- **`ForensicExportScreen`** — bundle ID + integrity hash display (monospace font), FileProvider sharing intent, cybercrime portal button
+
 ---
 
 ## System Architecture
@@ -152,8 +277,10 @@ Incoming call → CallStateMonitor (PHONE_STATE broadcast)
 ┌──────────────────────────────────────────────────────────────────────┐
 │                         PRESENTATION LAYER                           │
 │  Jetpack Compose (Material3)  │  Glassmorphism Dark Theme            │
-│  Navigation Compose           │  Home Screen Widget (AppWidget)      │
+│  5-Tab Navigation (Home/Shield/Network/Threats/More)                 │
 │  Haptic Feedback System       │  Animated Onboarding (Lottie)        │
+│  PageHeader component style   │  Glassmorphism surface components    │
+│  25 Screens across 5 security domains                                │
 ├──────────────────────────────────────────────────────────────────────┤
 │                        ORCHESTRATION LAYER                           │
 │  FraudMonitoringForegroundService  │  AppStartupCoordinator          │
@@ -166,6 +293,17 @@ Incoming call → CallStateMonitor (PHONE_STATE broadcast)
 │ Dedup    │ Pipeline │ Overlay │ TLS+QR    │  Signal/UPI            │
 │ 3xIngest │ Analyzer │ CallRec │ DomainRep │  ForwardDetect         │
 ├──────────┴──────────┴──────────┴───────────┴────────────────────────┤
+│                      ENDPOINT SECURITY LAYER  (NEW v2.0)            │
+│  DeviceIntegrityScanner (root/debug/patch)  │  SecurityPostureScore  │
+│  AppSecurityAuditor (40+ permission weights) │  PermissionRiskModel   │
+│  WifiSecurityAnalyzer (WPA3/evil-twin/DHNS) │  LocalNetworkScanner   │
+│  FirewallRuleStore (EncryptedSharedPrefs)   │  TrafficAnomalyDetector│
+├──────────────────────────────────────────────────────────────────────┤
+│                       THREAT INTELLIGENCE LAYER  (NEW v2.0)         │
+│  MitreAttackMapper (15 techniques, 13 tactics)  │  ForensicExporter  │
+│  TrackerDatabase (50+ signatures, 6 categories) │  STIX 2.1 export  │
+│  BreachChecker (HIBP v3, k-anonymity)           │  SecureVault       │
+├──────────────────────────────────────────────────────────────────────┤
 │                          ML / AI LAYER                               │
 │  DistilBERT (ONNX, English)   │  IndicBERT (ONNX, 11 Indic langs)  │
 │  Vosk ASR (call transcription) │  AiThreatScorer (web fraud)        │
@@ -173,8 +311,8 @@ Incoming call → CallStateMonitor (PHONE_STATE broadcast)
 ├──────────────────────────────────────────────────────────────────────┤
 │                          SECURITY LAYER                              │
 │  SQLCipher (AES-256-CBC)       │  Android Keystore (TEE/StrongBox)  │
-│  EncryptedFile (AES-256-GCM)   │  SHA-256 differential privacy      │
-│  EncryptedSharedPreferences     │  SMS deduplication guard           │
+│  EncryptedFile (AES-256-GCM)   │  SecureVault (AES/GCM/NoPadding)  │
+│  EncryptedSharedPreferences     │  SHA-256 differential privacy      │
 ├──────────────────────────────────────────────────────────────────────┤
 │                           DATA LAYER                                 │
 │  Room (FraudDao, ThreatDao)    │  ThreatSessionEntity               │
@@ -261,7 +399,7 @@ RakshakX/
 │   │   ├── pipeline/             # EmailThreatPipeline (orchestrator)
 │   │   ├── scoring/              # ThreatCorrelationEngine
 │   │   └── EmailScamDetector.kt  # ML classification entry point
-│   ├── web/                      # Web channel — 34 files
+│   ├── web/                      # Web channel — 37 files
 │   │   ├── services/             # FraudVpnService, DnsVpnRelay, AccessibilityMonitorService
 │   │   ├── analyzers/            # DomainRisk, ScamLanguage, BrowserNetworkCorrelation
 │   │   ├── extractors/           # PacketParser, TlsMetadataExtractor, RedirectChainTracker
@@ -275,7 +413,15 @@ RakshakX/
 │   │   ├── ModelResult.kt            # Classification output data class
 │   │   └── ScamAlertManager.kt       # Severity-based alert routing
 │   ├── core/                     # Cross-cutting concerns
-│   │   ├── correlation/          # MultiChannelCorrelationEngine (5 strategies)
+│   │   ├── correlation/          # MultiChannelCorrelationEngine (5 strategies) + MitreAttackMapper
+│   │   ├── integrity/            # DeviceIntegrityScanner, SecurityPostureScore  (NEW)
+│   │   ├── appsecurity/          # AppSecurityAuditor, PermissionRiskModel        (NEW)
+│   │   ├── network/              # WifiSecurityAnalyzer, LocalNetworkScanner      (NEW)
+│   │   ├── firewall/             # FirewallRule, FirewallRuleStore                (NEW)
+│   │   ├── privacy/              # TrackerDatabase (50+ signatures)               (NEW)
+│   │   ├── breach/               # BreachChecker (HIBP v3 k-anonymity)            (NEW)
+│   │   ├── vault/                # SecureVault (AES/GCM + EncryptedSharedPrefs)  (NEW)
+│   │   ├── forensics/            # ForensicExporter (STIX 2.1)                    (NEW)
 │   │   ├── threatintel/          # ThreatIntelligenceManager (SHA-256 sharing)
 │   │   ├── family/               # FamilyProtectionManager (role-based)
 │   │   ├── callerid/             # ScamCallDatabase (pre-call screening)
@@ -295,10 +441,21 @@ RakshakX/
 │   ├── startup/                  # AppStartupCoordinator (boot sequence)
 │   ├── widget/                   # SecurityWidgetProvider (home screen)
 │   └── ui/                       # Compose UI layer
-│       ├── screens/              # 10 screens (Dashboard, Logs, Correlation, Settings, etc.)
+│       ├── screens/              # 25 screens across 5 security domains
+│       │   ├── HomeDashboardScreen.kt, ThreatLogsScreen.kt, CorrelationScreen.kt
+│       │   ├── ShieldsControlScreen.kt, NetworkHubScreen.kt, MoreHubScreen.kt
+│       │   ├── DeviceHealthScreen.kt, AppAuditScreen.kt   (endpoint security)
+│       │   ├── WifiAuditScreen.kt, FirewallScreen.kt      (network security)
+│       │   ├── NetworkScanScreen.kt, TrafficMonitorScreen.kt
+│       │   ├── PrivacyDashboardScreen.kt, PrivacyScreen.kt, VaultScreen.kt
+│       │   ├── ThreatAnalyticsScreen.kt, ForensicExportScreen.kt
+│       │   ├── PasswordStudioScreen.kt, SettingsScreen.kt, ScanningScreen.kt
+│       │   ├── LiveThreatScreen.kt, ReportScreen.kt, ThreatIntelScreen.kt
+│       │   ├── FamilyProtectionScreen.kt
+│       │   └── AttackMatrixScreen.kt                      (MITRE ATT&CK)
 │       ├── components/           # Reusable threat cards, status chips, glass surfaces
-│       ├── navigation/           # NavHost + bottom navigation
-│       ├── anim/                 # Haptics.kt, Animations.kt
+│       ├── navigation/           # NavHost + bottom navigation (5 tabs, 25 routes)
+│       ├── anim/                 # Haptics.kt, Animations.kt, StaggeredEntry
 │       └── theme/                # Deep Navy glassmorphism dark theme
 ├── app/src/main/assets/
 │   ├── rakshakx_model/           # On-device ML models
@@ -368,7 +525,7 @@ See [docs/SECURITY.md](docs/SECURITY.md) for the complete security architecture.
 | AccessibilityService | Browser URL bar monitoring for web threat detection | Web threats |
 | VpnService | DNS-level network traffic analysis and blocking | Malicious domains |
 
-The app enforces a progressive onboarding flow — permissions are explained individually with security context before each grant.
+The app enforces a progressive onboarding flow — permissions are explained individually with security context before each grant. Accessibility Service is optional during onboarding and prompted when the user enables Web Shield.
 
 ---
 
@@ -500,13 +657,22 @@ The rule-based engine applies 8 keyword categories with contextual modifiers:
 
 | Metric | Count |
 |--------|-------|
-| Kotlin source files | 163 |
-| Core packages | 10 (sms, call, email, web, integration, core, data, notifications, ui, onboarding) |
+| Kotlin source files | 193 (+23 new security modules) |
+| Core packages | 18 (sms, call, email, web, integration, core/{integrity,appsecurity,network,firewall,privacy,breach,vault,forensics,correlation}, data, notifications, ui, onboarding) |
+| UI Screens | 25 (10 original + 15 new screens) |
+| Navigation tabs | 5 (Home, Shield, Network, Threats, More) |
+| Reusable UI Components | PageHeader, GlassCard, ShieldStatusCard, ThreatCard, SecurityScoreGauge + 12 more |
 | Room entities | 6 (SmsEvent, CallEvent, EmailEvent, WebEvent, ThreatSession, RiskScore) |
 | Activities | 12 |
 | Services | 6 (NotificationListener, Accessibility, VPN, FraudMonitoring, CallRecording, Overlay) |
 | Broadcast Receivers | 4 (SMS, Call, Boot, NotificationAction) |
 | ML Models | 3 (DistilBERT ONNX, IndicBERT ONNX, Vosk ASR) |
+| MITRE ATT&CK techniques | 15 mapped (Mobile framework) |
+| MITRE ATT&CK tactics | 13 (Initial Access → Resource Development) |
+| Tracker signatures | 50+ (analytics, advertising, crash reporting, fingerprinting, social, profiling) |
+| Traffic anomaly detectors | 5 (beaconing, DGA, DNS tunneling, cryptomining, exfiltration) |
+| Wi-Fi security checks | 4 (encryption, evil-twin, DNS hijack, captive portal) |
+| Network port scan targets | 12 ports (21/22/23/80/443/445/1883/5683/5900/3389/8080/8443) |
 | Supported languages | 12 (English + 11 Indic) |
 | Correlation strategies | 5 |
 | Notification channels | 5 |

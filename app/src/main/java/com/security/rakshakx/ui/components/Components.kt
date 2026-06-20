@@ -1,14 +1,19 @@
 package com.security.rakshakx.ui.components
 
 import androidx.compose.animation.core.*
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,8 +23,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -672,6 +680,96 @@ fun SectionHeader(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Page Header — logo + title + info guide
+// ═══════════════════════════════════════════════════════════════
+
+@Composable
+fun PageHeader(
+    title: String,
+    infoText: String,
+    onBack: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+    trailing: @Composable (RowScope.() -> Unit)? = null
+) {
+    val colors = LocalRakshakXColors.current
+    val context = LocalContext.current
+    val logoBitmap = remember {
+        context.assets.open("RXlogo.png").use { BitmapFactory.decodeStream(it) }
+    }
+    var showInfoDialog by remember { mutableStateOf(false) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        if (onBack != null) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(colors.surfaceElevated, RoundedCornerShape(12.dp))
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = colors.textPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+        }
+        Image(
+            bitmap = logoBitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.size(28.dp),
+            contentScale = ContentScale.Fit
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            color = colors.textPrimary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        if (trailing != null) {
+            trailing()
+        }
+        IconButton(
+            onClick = { showInfoDialog = true },
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = "Page Info",
+                tint = colors.textMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+
+    if (showInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            icon = { Icon(Icons.Filled.Info, null, tint = colors.primary) },
+            title = {
+                Text(title, fontWeight = FontWeight.Bold, color = colors.textPrimary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            text = {
+                Text(infoText, color = colors.textSecondary, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            },
+            confirmButton = {
+                TextButton(onClick = { showInfoDialog = false }) {
+                    Text("Got it", color = colors.primary)
+                }
+            },
+            containerColor = colors.cardBackground,
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Footer
 // ═══════════════════════════════════════════════════════════════
 
@@ -690,7 +788,7 @@ fun RakshakXFooter(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "RakshakX · On-device AI",
+            text = "RakshakX · v2.0.0",
             style = MaterialTheme.typography.labelSmall,
             color = TextMuted.copy(alpha = 0.5f)
         )

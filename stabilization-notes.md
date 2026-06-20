@@ -120,6 +120,27 @@ None of these are build errors. They can be addressed incrementally.
 
 ---
 
+## Phase 7 — v2.0.1 UI/UX Overhaul
+
+### Changes
+
+- Introduced shared `PageHeader` composable in `ui/components/Components.kt` (logo + title + info dialog)
+- Migrated all 25 screens from per-screen headers to `PageHeader`
+- Removed subtitles from all screen headers
+- Footer updated from "RakshakX · On-device AI" to "RakshakX · v2.0.0"
+- Splash screen: slide-up animation, `headlineLarge` title, new tagline
+- Onboarding welcome: enhanced glow ring with sweep gradients and outer aura
+- Home dashboard: ToolCards changed from horizontal to vertical layout
+- Shield Center: MITRE and intercepted count on separate lines
+- More Tools: badge inline with title, improved spacing
+- **Accessibility no longer required for `minimumDashboardReady`** — removed from `PermissionManager.buildReadinessState()`. Users are prompted for accessibility when enabling Web Shield in `ShieldsControlScreen` instead.
+
+### Build Status
+- No new lint errors introduced
+- All existing deprecation warnings remain unchanged
+
+---
+
 ## Remaining Technical Debt
 
 See [ROADMAP.md](docs/ROADMAP.md#technical-debt--remaining) for the current debt list and priorities.

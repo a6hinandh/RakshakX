@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Shared CSV reports stored in the cache/shared_reports directory -->
+    <cache-path name="shared_reports" path="shared_reports/" />
+    <!-- Forensics exports in public external storage -->
+    <external-path name="forensics" path="Download/rakshakx_forensics/" />
+    <!-- Fallback if we still use external files dir sometimes -->
+    <external-files-path name="external_files" path="." />
+</paths>

@@ -2,8 +2,12 @@ package com.security.rakshakx.core
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.security.rakshakx.call.callanalysis.data.CallDatabase
+import com.security.rakshakx.call.core.storage.DatabaseFactory
+import com.security.rakshakx.email.database.ThreatDatabase as EmailThreatDb
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.io.File
 
 class SettingsStore(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("rakshakx_settings", Context.MODE_PRIVATE)
@@ -72,5 +76,38 @@ class SettingsStore(context: Context) {
     fun setSensitivity(value: Float) {
         prefs.edit().putFloat(KEY_SENSITIVITY, value).apply()
         _sensitivity.value = value
+    }
+
+    suspend fun clearAllData(context: Context) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            // Clear SharedPreferences
+            prefs.edit().clear().apply()
+            _smsEnabled.value = true
+            _callEnabled.value = true
+            _emailEnabled.value = true
+            _webEnabled.value = true
+            _autoDeleteDays.value = 30
+            _sensitivity.value = 0.5f
+
+            // Clear Room databases
+            try {
+                CallDatabase.getInstance(context).clearAllTables()
+            } catch (_: Exception) {}
+            try {
+                EmailThreatDb.getDatabase(context).clearAllTables()
+            } catch (_: Exception) {}
+            try {
+                DatabaseFactory.getInstance(context).clearAllTables()
+            } catch (_: Exception) {}
+            try {
+                com.security.rakshakx.web.storage.ThreatDatabase.getInstance(context).clearAllTables()
+            } catch (_: Exception) {}
+
+            // Clear temp files in cache
+            try {
+                val sharedReportsDir = File(context.cacheDir, "shared_reports")
+                sharedReportsDir.deleteRecursively()
+            } catch (_: Exception) {}
+        }
     }
 }

@@ -6,11 +6,12 @@ This document describes the system architecture of RakshakX, an on-device Androi
 
 ## Design Philosophy
 
-RakshakX follows three architectural principles:
+RakshakX follows four architectural principles:
 
 1. **Defense in depth** — Every attack surface has multiple detection layers (ML, rules, behavioral, reputation). No single bypass defeats the system.
 2. **Privacy by architecture** — All computation runs on-device. The system is designed so that data exfiltration is architecturally impossible, not just policy-prohibited.
 3. **Correlation over isolation** — Individual channel detectors catch obvious threats. The cross-channel correlation engine catches coordinated attacks that single-channel filters miss — the real differentiator.
+4. **Full-spectrum endpoint security** — Beyond communication threats, RakshakX evaluates the security posture of the device itself (integrity, installed apps, network, data exposures) and maps all findings to the MITRE ATT&CK for Mobile framework.
 
 ---
 
@@ -20,8 +21,9 @@ RakshakX follows three architectural principles:
 ┌──────────────────────────────────────────────────────────────────────┐
 │                         PRESENTATION LAYER                           │
 │  Jetpack Compose (Material3)  │  Glassmorphism Dark Theme            │
-│  Navigation Compose           │  Home Screen Widget (AppWidget)      │
+│  5-Tab Navigation Compose     │  Home Screen Widget (AppWidget)      │
 │  Haptic Feedback System       │  Animated Onboarding (Lottie)        │
+│  25 screens across 5 security domains                                │
 ├──────────────────────────────────────────────────────────────────────┤
 │                        ORCHESTRATION LAYER                           │
 │  FraudMonitoringForegroundService  │  AppStartupCoordinator          │
@@ -34,6 +36,19 @@ RakshakX follows three architectural principles:
 │ Dedup    │ Pipeline │ Overlay │ TLS+QR    │  Signal/UPI            │
 │ 3xIngest │ Analyzer │ CallRec │ DomainRep │  ForwardDetect         │
 ├──────────┴──────────┴──────────┴───────────┴────────────────────────┤
+│                     ENDPOINT SECURITY LAYER                          │
+│  DeviceIntegrityScanner        │  SecurityPostureScore (A–F grade)  │
+│  AppSecurityAuditor             │  PermissionRiskModel (40+ weights) │
+│  WifiSecurityAnalyzer           │  LocalNetworkScanner (254 hosts)   │
+│  FirewallRuleStore              │  TrafficAnomalyDetector (5 types)  │
+├──────────────────────────────────────────────────────────────────────┤
+│                     THREAT INTELLIGENCE LAYER                        │
+│  MitreAttackMapper (15 techniques / 13 tactics, ATT&CK Mobile)      │
+│  ForensicExporter (STIX 2.1, SHA-256 integrity)                     │
+│  TrackerDatabase (50+ signatures, 6 categories)                     │
+│  BreachChecker (HIBP v3 k-anonymity, HttpURLConnection only)        │
+│  SecureVault (AES/GCM/NoPadding + EncryptedSharedPreferences)       │
+├──────────────────────────────────────────────────────────────────────┤
 │                          ML / AI LAYER                               │
 │  DistilBERT (ONNX, English)   │  IndicBERT (ONNX, 11 Indic langs)  │
 │  Vosk ASR (call transcription) │  AiThreatScorer (web fraud)        │
@@ -41,8 +56,9 @@ RakshakX follows three architectural principles:
 ├──────────────────────────────────────────────────────────────────────┤
 │                          SECURITY LAYER                              │
 │  SQLCipher (AES-256-CBC)       │  Android Keystore (TEE/StrongBox)  │
-│  EncryptedFile (AES-256-GCM)   │  SHA-256 differential privacy      │
-│  EncryptedSharedPreferences     │  SMS deduplication guard           │
+│  EncryptedFile (AES-256-GCM)   │  SecureVault (AES/GCM/NoPadding)  │
+│  EncryptedSharedPreferences     │  SHA-256 differential privacy      │
+│  SMS deduplication guard        │  STIX 2.1 forensic bundles         │
 ├──────────────────────────────────────────────────────────────────────┤
 │                           DATA LAYER                                 │
 │  Room (FraudDao, ThreatDao)    │  ThreatSessionEntity               │
@@ -162,7 +178,7 @@ Incoming call → CallStateMonitor detects PHONE_STATE = OFFHOOK
 - The overlay requires `SYSTEM_ALERT_WINDOW` — this is granted via the onboarding flow, not silently
 - Pre-call screening via `ScamCallDatabase` can auto-silence known scam numbers before the user picks up
 
-### Web Channel (`web/` — 34 files)
+### Web Channel (`web/` — 37 files)
 
 **Threat coverage:** Phishing sites, malware distribution domains, typosquatting, redirect chain attacks, DNS-based threats, malicious QR codes.
 
@@ -225,6 +241,140 @@ Browser request → FraudVpnService (TUN interface at 10.0.0.1)
 - UPI deep-link detection (`upi://pay?...` patterns)
 - UPI collect request scam detection
 - Cross-channel correlation with recent SMS/call/email events
+
+---
+
+## Endpoint Security Architecture
+
+### Device Integrity Scanner (`core/integrity/`)
+
+```
+DeviceIntegrityScanner.scan(context)
+  ├── Root detection
+  │     ├── /system/bin/su, /system/xbin/su, /sbin/su, /data/local/su checks
+  │     ├── Build.TAGS == "test-keys" (engineering build)
+  │     ├── Magisk paths (.magisk), SuperSU artifacts
+  │     └── Runtime: exec("which su") — detects PATH-based su
+  ├── Debug / development state
+  │     ├── ApplicationInfo.FLAG_DEBUGGABLE
+  │     ├── Settings.Global.ADB_ENABLED
+  │     └── Settings.Global.DEVELOPMENT_SETTINGS_ENABLED
+  ├── Security hygiene
+  │     ├── Security patch age (> 90 days = -15 pts)
+  │     ├── Screen lock type (NONE = -15 pts)
+  │     ├── Storage encryption state (MEDIA_ENCRYPTED = -10 pts)
+  │     └── Play Protect status via PackageManager
+  └── DeviceIntegrityResult
+        ├── overallScore (0–100, sum of deductions from 100)
+        └── findings: List<SecurityFinding> with severity, title, description, recommendation
+```
+
+`SecurityPostureScore.compute(deviceScore, networkScore, threatCount)` applies weights 40/30/30 and maps to letter grades A (90+) through F (<50).
+
+### App Security Auditor (`core/appsecurity/`)
+
+```
+AppSecurityAuditor.auditInstalledApps(context)
+  → PackageManager.getInstalledPackages(GET_PERMISSIONS | GET_META_DATA)
+      │
+      ├── InstallSource via PackageManager.getInstallerPackageName()
+      │     ├── com.android.vending           → PLAY_STORE
+      │     ├── com.google.android.packageinstaller → PLAY_STORE
+      │     ├── system / null + priv-app path → SYSTEM
+      │     └── anything else                 → SIDELOADED
+      │
+      ├── PermissionRiskModel.computeRisk(requestedPermissions)
+      │     ├── Individual weight lookup (CAMERA:15, RECORD_AUDIO:15, etc.)
+      │     ├── Spyware cluster: CAMERA + RECORD_AUDIO + INTERNET → +20
+      │     ├── Data harvesting: CONTACTS + READ_SMS + CALL_LOG → +15
+      │     └── Overlay attack: SYSTEM_ALERT_WINDOW + BIND_ACCESSIBILITY → +20
+      │
+      └── AppRiskProfile
+            ├── riskLevel: SAFE (<20) / LOW (<40) / MEDIUM (<60) / HIGH (<80) / CRITICAL (≥80)
+            └── sorted by riskScore descending
+```
+
+### Wi-Fi Security Analyzer (`core/network/`)
+
+```
+WifiSecurityAnalyzer.analyze(context)
+  ├── WifiManager.connectionInfo + scanResults
+  ├── Encryption detection
+  │     └── capabilities.contains("WPA3") / "WPA2" / "WPA" / "WEP" / none → OPEN
+  ├── Evil-twin detection
+  │     └── scanResults.filter { ssid == currentSsid && rssi > -70 }
+  │           └── multiple BSSIDs = rogue AP detected
+  ├── DNS hijack check
+  │     └── InetAddress.getByName("connectivitycheck.gstatic.com")
+  │           └── IP not in [142.250.x, 216.58.x, 172.217.x, 74.125.x] → HIJACKED
+  └── Captive portal check
+        └── URL("http://connectivitycheck.gstatic.com/generate_204").openConnection()
+              └── responseCode != 204 → portal detected
+```
+
+### Traffic Anomaly Detector (`web/analyzers/`)
+
+```
+TrafficAnomalyDetector.recordQuery(domain)  ← called by DnsVpnRelay per DNS query
+TrafficAnomalyDetector.analyze()            ← called by TrafficMonitorScreen
+
+Detection algorithms:
+  ├── BEACONING    inter-arrival variance < 5s² AND avg < 2min
+  ├── DGA          entropy(domain) > 3.5 AND consonant_run > 8
+  │                AND digit_ratio > 0.3 AND len > 15
+  ├── DNS_TUNNEL   max label len > 30 chars → HIGH
+  │                OR > 50 queries/min → MEDIUM
+  ├── CRYPTOMINING domain in Set(24 known pool domains)
+  └── EXFILTRATION unique subdomains per apex > 100 in 5min window
+```
+
+### Forensic Export (`core/forensics/`)
+
+```
+ForensicExporter.exportBundle(context, threats)
+  ├── STIX 2.1 JSON structure:
+  │     ├── threat-actor object (adversary node)
+  │     ├── identity object (device fingerprint: SHA-256(ANDROID_ID + appVersion))
+  │     ├── indicator objects (one per threat, with pattern and valid_from)
+  │     ├── relationship objects (indicator → threat-actor)
+  │     └── report object (bundle metadata, published timestamp)
+  ├── computeIntegrityHash(bundle): SHA-256 of the full JSON string
+  └── Writes to getExternalFilesDir()/rakshakx_forensics/stix_<timestamp>.json
+```
+
+---
+
+## Threat Intelligence Layer
+
+### MITRE ATT&CK Mapper (`core/correlation/`)
+
+`MitreAttackMapper` maps RakshakX threat categories to ATT&CK for Mobile techniques:
+
+| Threat Category | Technique ID | Tactic |
+|-----------------|-------------|--------|
+| SMS_PHISHING | T1660 | Initial Access |
+| VOICE_PHISHING | T1660.001 | Initial Access |
+| EMAIL_PHISHING | T1566 | Initial Access |
+| MALICIOUS_URL | T1659 | Initial Access |
+| CREDENTIAL_HARVEST | T1417 | Collection |
+| OTP_FRAUD | T1430 | Collection |
+| DNS_HIJACK | T1584.002 | Resource Development |
+| APP_OVERLAY | T1665 | Defense Evasion |
+| COORDINATED_ATTACK | T1460 | Collection |
+| MALWARE_APP | T1476 | Initial Access |
+| SPYWARE | T1418 | Discovery |
+| PRIVILEGE_ABUSE | T1404 | Privilege Escalation |
+| DATA_EXFIL | T1437 | Exfiltration |
+| BEACONING | T1571 | Command & Control |
+| CRYPTOMINING | T1496 | Impact |
+
+Detection flow:
+```
+ThreatLogRepository.getAllThreats(context)
+  → categories.map { it.title.uppercase().replace(" ", "_") }
+  → MitreAttackMapper.mapMultiple(categories).distinctBy { it.techniqueId }
+  → AttackMatrixScreen renders grouped by AttackTactic
+```
 
 ---
 
@@ -438,7 +588,18 @@ ui/ ──→ core/ ──→ data/
  │        ├──→ email/    (EmailScamDetector → ScamClassifierRouter)
  │        ├──→ call/     (CallScamDetector → ScamClassifierRouter)
  │        └──→ web/      (WebScamDetector → ScamClassifierRouter)
+ │                └──→ web/analyzers/TrafficAnomalyDetector (DNS query stream)
  │
+ ├──→ core/integrity/    (DeviceIntegrityScanner, SecurityPostureScore)
+ ├──→ core/appsecurity/  (AppSecurityAuditor → PackageManager)
+ ├──→ core/network/      (WifiSecurityAnalyzer → WifiManager)
+ │                        (LocalNetworkScanner → InetAddress + /proc/net/arp)
+ ├──→ core/firewall/     (FirewallRuleStore → EncryptedSharedPreferences)
+ ├──→ core/privacy/      (TrackerDatabase → installed package names)
+ ├──→ core/breach/       (BreachChecker → HIBP v3 API / HttpURLConnection)
+ ├──→ core/vault/        (SecureVault → AndroidKeyStore + EncryptedSharedPreferences)
+ ├──→ core/forensics/    (ForensicExporter → ExternalFilesDir)
+ ├──→ core/correlation/  (MitreAttackMapper ← threat categories)
  ├──→ notifications/ (RakshakNotificationListenerService → all channel detectors)
  ├──→ permissions/ (PermissionManager → readiness state model)
  ├──→ onboarding/ (progressive permission setup)
@@ -446,7 +607,7 @@ ui/ ──→ core/ ──→ data/
  └──→ widget/ (SecurityWidgetProvider → home screen)
 ```
 
-All channels converge on `ScamClassifierRouter` for ML classification and `FraudDao` for persistence. Cross-channel correlation flows through `core/correlation/MultiChannelCorrelationEngine`, which queries all channel DAOs.
+All channels converge on `ScamClassifierRouter` for ML classification and `FraudDao` for persistence. Cross-channel correlation flows through `core/correlation/MultiChannelCorrelationEngine`, which queries all channel DAOs. New endpoint security modules are stateless singletons that read Android system APIs directly and do not depend on the Room database.
 
 ---
 
@@ -465,3 +626,11 @@ All channels converge on `ScamClassifierRouter` for ML classification and `Fraud
 6. **Encrypted everything** — Threat logs contain sensitive metadata (phone numbers, message snippets, URLs). SQLCipher AES-256 encryption with Android Keystore-backed keys ensures that even on a compromised device, threat data is not readable without the Keystore credential.
 
 7. **No cloud dependencies** — All detection runs on-device. This is a security choice, not a cost optimization — a cybersecurity app that sends user communications to a cloud API is a data exfiltration vector itself.
+
+8. **k-Anonymity for breach checks** — `BreachChecker` sends only the first 5 hex characters of a SHA-1 password hash to the HIBP range API. The full hash never leaves the device. Matching happens locally against the returned suffix list. This is the same technique used by 1Password and Firefox Monitor.
+
+9. **Two-layer vault encryption** — `SecureVault` applies AES/GCM/NoPadding using an AndroidKeyStore key (hardware-backed on TEE/StrongBox devices), then stores the ciphertext in `EncryptedSharedPreferences` which adds a second AES-256-GCM layer. Compromise of either layer alone is insufficient to read vault entries.
+
+10. **STIX 2.1 for forensics** — Using an industry standard (Structured Threat Information eXpression) for forensic exports ensures that threat data from RakshakX can be imported into any STIX-compatible SIEM, threat intelligence platform, or law enforcement tool without conversion. This makes incident reports actionable rather than app-specific.
+
+11. **Stateless endpoint scanners** — `DeviceIntegrityScanner`, `AppSecurityAuditor`, `WifiSecurityAnalyzer`, and `LocalNetworkScanner` are Kotlin `object` singletons with no persistent state. Each scan reads Android system APIs fresh. This avoids stale cached state and ensures scan results reflect current device conditions rather than a snapshot from app launch.
